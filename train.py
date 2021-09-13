@@ -1,6 +1,8 @@
 import os
 import time
+import torch
 from tqdm import tqdm
+from torch.utils.data.dataloader import default_collate
 
 from options.options import Options
 from models import resnet_model
@@ -51,9 +53,19 @@ if __name__ == '__main__':
         print('End of epoch %d / %d \t Time Taken: %d sec' % (epoch, opt.num_epoch, time.time() - epoch_start_time))
 
     # evaluate and save result tqdm
-    with tqdm(total=len(dataset)) as progress_bar:
-        for i, data in enumerate(dataset):
-            model.set_input(data)
-            model.forward()
-            model.save_result()
-            progress_bar.update(opt.batch_size)
+    dataset = dataset.dataset
+    bsz = model.opt.batch_size
+    for i in tqdm(range(0, len(dataset), bsz)):
+        batch = []
+        for j in range(i, i+bsz):
+            if j >= len(dataset):
+                j = len(dataset) - 1
+            data = dataset[j]
+            batch.append(data)
+        batch = default_collate(batch)
+        for k in batch:
+            if torch.is_tensor(batch[k]):
+                batch[k] = batch[k].cuda()
+        model.set_input(batch)
+        model.forward()
+        model.save_result()

@@ -4,30 +4,26 @@ set -ex
 video_dir="data/video"
 audio_dir="data/test_audio"
 
-# # create directory
-# mkdir -p $video_dir/full
-# mkdir -p $video_dir/crop
-# mkdir -p $video_dir/audio
 
-# set video clip duration
-start_time="00:00:00"
-end_time="240"
+# -------------------------------------------------------------------------------------------------------------------- #
+#                                                    Data preparing                                                    #
+# -------------------------------------------------------------------------------------------------------------------- #
 
+# create directory
+mkdir -p $video_dir/full
+mkdir -p $video_dir/crop
+mkdir -p $video_dir/audio
+mkdir -p $video_dir/feature
 
-# extract video frames and audio
-# /usr/bin/ffmpeg -hide_banner -y -i $video_dir/*.mp4 -ss $start_time -t $end_time -r 25 $video_dir/full/%05d.png
-# /usr/bin/ffmpeg -hide_banner -y -i $video_dir/*.mp4 -ss $start_time -t $end_time $video_dir/audio/audio.aac
-
-
-# extract high-level feature from audio
-# mkdir -p $video_dir/feature
+# # set video clip duration
+# start_time="-ss 00:00:00"
+# # end_time="-t 240"
+# end_time=""
+# # extract video frames and audio
+# /usr/bin/ffmpeg -hide_banner -y -i $video_dir/*.mp4 $start_time $end_time -r 25 $video_dir/full/%05d.png
+# /usr/bin/ffmpeg -hide_banner -y -i $video_dir/*.mp4 $start_time $end_time $video_dir/audio/audio.aac
+# # extract high-level feature from audio
 # python vendor/ATVGnet/code/test.py -i $video_dir/
-
-
-# extract high-level feature from test audio
-# mkdir -p $audio_dir/feature
-# python vendor/ATVGnet/code/test.py -i $audio_dir/
-
 
 # # crop and resize video frames
 # python utils/crop_portrait.py \
@@ -36,28 +32,29 @@ end_time="240"
 #    --vertical_adjust 0.2
 
 
-# # # 3D face reconstruction
-# python train.py \
-#     --data_dir $video_dir \
-#     --num_epoch 20 \
-#     --serial_batches False \
-#     --display_freq 400 \
-#     --print_freq 400 \
-#     --batch_size 5
+# -------------------------------------------------------------------------------------------------------------------- #
+#                                                3D face reconstruction                                                #
+# -------------------------------------------------------------------------------------------------------------------- #
+
+python train.py \
+    --data_dir $video_dir \
+    --num_epoch 20 \
+    --serial_batches False \
+    --display_freq 400 \
+    --print_freq 400 \
+    --batch_size 5
+# create reconstruction debug video
+/usr/bin/ffmpeg -hide_banner -y -loglevel warning \
+    -thread_queue_size 8192 -i $video_dir/render/%05d.png \
+    -thread_queue_size 8192 -i $video_dir/crop/%05d.png \
+    -thread_queue_size 8192 -i $video_dir/overlay/%05d.png \
+    -i $video_dir/audio/audio.aac \
+    -filter_complex hstack=inputs=3 -vcodec libx264 -preset slower -profile:v high -crf 18 -pix_fmt yuv420p $video_dir/debug.mp4
 
 
-# build neural face renderer data pair
-# python utils/build_nfr_dataset.py --data_dir $video_dir
-
-
-# # # create reconstruction debug video
-# /usr/bin/ffmpeg -hide_banner -y -loglevel warning \
-#     -thread_queue_size 8192 -i $video_dir/render/%05d.png \
-#     -thread_queue_size 8192 -i $video_dir/crop/%05d.png \
-#     -thread_queue_size 8192 -i $video_dir/overlay/%05d.png \
-#     -i $video_dir/audio/audio.aac \
-#     -filter_complex hstack=inputs=3 -vcodec libx264 -preset slower -profile:v high -crf 18 -pix_fmt yuv420p $video_dir/debug.mp4
-
+# -------------------------------------------------------------------------------------------------------------------- #
+#                                                Train Audio2Expression                                                #
+# -------------------------------------------------------------------------------------------------------------------- #
 
 # # # train audio2expression network
 # python train_exp.py \
@@ -73,6 +70,13 @@ end_time="240"
 #     --net_dir $video_dir
 
 
+# -------------------------------------------------------------------------------------------------------------------- #
+#                                              Train neural face renderer                                              #
+# -------------------------------------------------------------------------------------------------------------------- #
+
+# build neural face renderer data pair
+# python utils/build_nfr_dataset.py --data_dir $video_dir
+
 
 # # train neural face renderer
 # python vendor/neural-face-renderer/train.py 
@@ -81,6 +85,14 @@ end_time="240"
 #     --input_nc 21 --Nw 7 --batch_size 16 --preprocess none --num_threads 4 --n_epochs 250 \
 #     --n_epochs_decay 0 --load_size 256
 
+
+# -------------------------------------------------------------------------------------------------------------------- #
+#                                                        Testing                                                       #
+# -------------------------------------------------------------------------------------------------------------------- #
+
+# # extract high-level feature from test audio
+# mkdir -p $audio_dir/feature
+# python vendor/ATVGnet/code/test.py -i $audio_dir/
 
 # predict expression parameter fron audio feature
 # python test_exp.py --dataset_mode audio_expression \

@@ -36,30 +36,30 @@ mkdir -p $video_dir/feature
 #                                                3D face reconstruction                                                #
 # -------------------------------------------------------------------------------------------------------------------- #
 
-python train.py \
-    --data_dir $video_dir \
-    --num_epoch 20 \
-    --serial_batches False \
-    --display_freq 400 \
-    --print_freq 400 \
-    --batch_size 5
-# create reconstruction debug video
-/usr/bin/ffmpeg -hide_banner -y -loglevel warning \
-    -thread_queue_size 8192 -i $video_dir/render/%05d.png \
-    -thread_queue_size 8192 -i $video_dir/crop/%05d.png \
-    -thread_queue_size 8192 -i $video_dir/overlay/%05d.png \
-    -i $video_dir/audio/audio.aac \
-    -filter_complex hstack=inputs=3 -vcodec libx264 -preset slower -profile:v high -crf 18 -pix_fmt yuv420p $video_dir/debug.mp4
+# python train.py \
+#     --data_dir $video_dir \
+#     --num_epoch 40 \
+#     --serial_batches False \
+#     --display_freq 400 \
+#     --print_freq 400 \
+#     --batch_size 5
+# # create reconstruction debug video
+# /usr/bin/ffmpeg -hide_banner -y -loglevel warning \
+#     -thread_queue_size 8192 -i $video_dir/render/%05d.png \
+#     -thread_queue_size 8192 -i $video_dir/crop/%05d.png \
+#     -thread_queue_size 8192 -i $video_dir/overlay/%05d.png \
+#     -i $video_dir/audio/audio.aac \
+#     -filter_complex hstack=inputs=3 -vcodec libx264 -preset slower -profile:v high -crf 18 -pix_fmt yuv420p $video_dir/debug.mp4
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
 #                                                Train Audio2Expression                                                #
 # -------------------------------------------------------------------------------------------------------------------- #
 
-# # # train audio2expression network
+# # train audio2expression network
 # python train_exp.py \
 #     --dataset_mode audio_expression \
-#     --num_epoch 10 \
+#     --num_epoch 20 \
 #     --serial_batches False \
 #     --display_freq 800 \
 #     --print_freq 800 \
@@ -74,12 +74,12 @@ python train.py \
 #                                              Train neural face renderer                                              #
 # -------------------------------------------------------------------------------------------------------------------- #
 
-# build neural face renderer data pair
+# # build neural face renderer data pair
 # python utils/build_nfr_dataset.py --data_dir $video_dir
 
 
 # # train neural face renderer
-# python vendor/neural-face-renderer/train.py 
+# python vendor/neural-face-renderer/train.py \
 #     --dataroot $video_dir/nfr/AB --name nfr --model nfr --checkpoints_dir $video_dir/checkpoints \
 #     --netG unet_256 --direction BtoA --lambda_L1 100 --dataset_mode temporal --norm batch --pool_size 0 --use_refine \
 #     --input_nc 21 --Nw 7 --batch_size 16 --preprocess none --num_threads 4 --n_epochs 250 \
@@ -94,7 +94,7 @@ python train.py \
 # mkdir -p $audio_dir/feature
 # python vendor/ATVGnet/code/test.py -i $audio_dir/
 
-# predict expression parameter fron audio feature
+# # predict expression parameter fron audio feature
 # python test_exp.py --dataset_mode audio_expression \
 #     --data_dir $audio_dir \
 #     --net_dir $video_dir
@@ -104,10 +104,9 @@ python train.py \
 # python reenact.py --src_dir $audio_dir --tgt_dir $video_dir
 
 
+# neural rendering the reenact face sequence
 # choose best epoch with lowest loss
 # epoch=50
-
-# neural rendering the reenact face sequence
 # python vendor/neural-face-renderer/test.py --model test \
 #     --netG unet_256 \
 #     --direction BtoA \

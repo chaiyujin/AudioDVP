@@ -19,12 +19,14 @@ def parse_args():
 
     return parser.parse_args()
 
+
 config = parse_args()
+
 
 def multi2single(model_path, id):
     checkpoint = torch.load(model_path)
     state_dict = checkpoint
-    if id ==1:
+    if id == 1:
         new_state_dict = OrderedDict()
         for k, v in state_dict.items():
             name = k[7:]
@@ -51,7 +53,7 @@ def test():
     with torch.no_grad():
         input_mfcc = []
         while ind <= int(mfcc.shape[0]/4) - 4:
-            t_mfcc =mfcc[( ind - 3) * 4: (ind + 4) * 4, 1:]
+            t_mfcc = mfcc[( ind - 3) * 4: (ind + 4) * 4, 1:]
             t_mfcc = torch.FloatTensor(t_mfcc).cuda()
             input_mfcc.append(t_mfcc)
             ind += 1
@@ -65,6 +67,7 @@ def test():
         for i in tqdm(range(features_lengh)):
             torch.save(features[i][0].detach().cpu(), os.path.join(config.in_file, 'feature/%05d.pt' % (i+1)))
 
-        print('feature length:',features_lengh)
+        # print('feature length:',features_lengh)
+
 
 test()

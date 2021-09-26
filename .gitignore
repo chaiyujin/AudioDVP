@@ -9,6 +9,7 @@ data/test_audio/reenact
 data/test_audio/images
 data/test_audio/comp
 data/test_audio/result.mp4
+data/
 
 */*.pyc
 */**/*.pyc

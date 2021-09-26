@@ -12,7 +12,7 @@ class MultiDataset(BaseDataset):
     """ 'SingleDataset' doesn't require to be temporally contiguous. So does MultiDataset """
 
     def __init__(self, opt):
-        super().__init__(self, opt)
+        BaseDataset.__init__(self, opt)
 
         # load data paths
         self.load_images_and_landmarks()
@@ -47,8 +47,9 @@ class MultiDataset(BaseDataset):
         clip_dirs = []
         for dirpath, subdirs, _ in os.walk(self.opt.data_dir):
             for subdir in subdirs:
-                if subdir.startswith("clip"):
+                if subdir.startswith("clip") and os.path.exists(os.path.join(dirpath, subdir, "crop")):
                     clip_dirs.append(os.path.join(dirpath, subdir))
+        clip_dirs = sorted(clip_dirs)
         
         # load from each clip
         for clip_dir in clip_dirs:

@@ -90,6 +90,7 @@ class MultiAudioExprDataset(BaseDataset):
             for subdir in subdirs:
                 if subdir.startswith("clip"):
                     clip_dirs.append(os.path.join(dirpath, subdir))
+        clip_dirs = sorted(clip_dirs)
         
         # load clips
         for clip_dir in clip_dirs:

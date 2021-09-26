@@ -49,12 +49,8 @@ class MultiDataset(BaseDataset):
         self.landmark_dict = dict()
 
         # find clips
-        clip_dirs = []
-        for dirpath, subdirs, _ in os.walk(self.opt.data_dir):
-            for subdir in subdirs:
-                if subdir.startswith("clip") and os.path.exists(os.path.join(dirpath, subdir, "crop")):
-                    clip_dirs.append(os.path.join(dirpath, subdir))
-        clip_dirs = sorted(clip_dirs)
+        # !IMPORTANT: Load both train and test data for 3D reconstruction!
+        clip_dirs = util.find_clip_dirs(self.opt.data_dir, with_train=True, with_test=True)
         
         # load from each clip
         for clip_dir in clip_dirs:

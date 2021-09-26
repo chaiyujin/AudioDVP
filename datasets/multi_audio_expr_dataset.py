@@ -9,7 +9,7 @@ class MultiAudioExprDataset(BaseDataset):
     """ 'AudioExpressionDataaset' requires to be TEMPORALLY CONTIGUOUS. So does this """
 
     def __init__(self, opt):
-        super().__init__(self, opt)
+        BaseDataset.__init__(self, opt)
         self.load_data()
 
     def __len__(self):
@@ -67,16 +67,16 @@ class MultiAudioExprDataset(BaseDataset):
 
         def _load_dir(clip_dir):
             ret = dict()
-            ret['feature_list'] = util.load_coef(os.path.join(clip_dir, 'feature'))
-            ret['filenames'] = util.get_file_list(os.path.join(clip_dir, 'feature'))
+            ret['feature_list'] = util.load_coef(os.path.join(clip_dir, 'feature'), verbose=False)
+            ret['filenames']    = util.get_file_list(os.path.join(clip_dir, 'feature'))
 
             if self.opt.isTrain:
-                ret['alpha_list'] = util.load_coef(os.path.join(clip_dir, 'alpha'))
-                ret['beta_list'] = util.load_coef(os.path.join(clip_dir, 'beta'))
-                ret['delta_list'] = util.load_coef(os.path.join(clip_dir, 'delta'))
-                ret['gamma_list'] = util.load_coef(os.path.join(clip_dir, 'gamma'))
-                ret['rotation_list'] = util.load_coef(os.path.join(clip_dir, 'rotation'))
-                ret['translation_list'] = util.load_coef(os.path.join(clip_dir, 'translation'))
+                ret['alpha_list']       = util.load_coef(os.path.join(clip_dir, 'alpha'      ), verbose=False)
+                ret['beta_list']        = util.load_coef(os.path.join(clip_dir, 'beta'       ), verbose=False)
+                ret['delta_list']       = util.load_coef(os.path.join(clip_dir, 'delta'      ), verbose=False)
+                ret['gamma_list']       = util.load_coef(os.path.join(clip_dir, 'gamma'      ), verbose=False)
+                ret['rotation_list']    = util.load_coef(os.path.join(clip_dir, 'rotation'   ), verbose=False)
+                ret['translation_list'] = util.load_coef(os.path.join(clip_dir, 'translation'), verbose=False)
 
             self.clips.append(ret)
             # append coordinates
@@ -85,13 +85,10 @@ class MultiAudioExprDataset(BaseDataset):
                 self.coordinates.append((idx_clip, idx_feat))
         
         # find clips
-        clip_dirs = []
-        for dirpath, subdirs, _ in os.walk(self.opt.data_dir):
-            for subdir in subdirs:
-                if subdir.startswith("clip"):
-                    clip_dirs.append(os.path.join(dirpath, subdir))
-        clip_dirs = sorted(clip_dirs)
-        
+        is_train = self.opt.isTrain  # load correct part
+        clip_dirs = util.find_clip_dirs(self.opt.data_dir, with_train=is_train, with_test=(not is_train))
+ 
         # load clips
         for clip_dir in clip_dirs:
+            # print(clip_dir)
             _load_dir(clip_dir)

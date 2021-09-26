@@ -51,11 +51,14 @@ def load_state_dict(model, fname):
             pass
 
 
-def load_coef(data_dir, load_num=float('inf')):
+def load_coef(data_dir, load_num=float('inf'), verbose=True):
     coef_list = []
     count = 0
 
-    for filename in tqdm(get_file_list(data_dir)):
+    pbar = get_file_list(data_dir)
+    if verbose:
+        pbar = tqdm(pbar)
+    for filename in pbar:
         coef = torch.load(filename)
         coef_list.append(coef)
         count += 1
@@ -99,3 +102,22 @@ def plot_landmark(data_dir):
             image = cv2.circle(image, (point[0], point[1]), radius=0, color=(255, 0, 0), thickness=-1)
 
         cv2.imwrite(os.path.join(data_dir, 'landmark', os.path.basename(image_name)), image)
+
+
+def find_clip_dirs(data_dir, with_train, with_test):
+    # find clips
+    clip_dirs = []
+    for dirpath, subdirs, _ in os.walk(data_dir):
+        # check if train data
+        if os.path.basename(dirpath) == 'train' and not with_train:
+            continue
+        # check if test data
+        if os.path.basename(dirpath) == 'test' and not with_test:
+            continue
+        # collect
+        for subdir in subdirs:
+            if subdir.startswith("clip") and os.path.exists(os.path.join(dirpath, subdir, "crop")):
+                clip_dirs.append(os.path.join(dirpath, subdir))
+    clip_dirs = sorted(clip_dirs)
+    return clip_dirs
+

@@ -12,15 +12,15 @@ from utils.visualizer import Visualizer
 
 if __name__ == '__main__':
     opt = Options().parse_args()   # get training options
-
     dataset = create_dataset(opt)
-
     model = resnet_model.ResnetModel(opt)
-
     visualizer = Visualizer(opt)   # create a visualizer that display/save images and plots
 
-    total_iters = 0
+    # * ------------------------------------------------------------------------------------------------------------ * #
+    # *                                                   Training                                                   * #
+    # * ------------------------------------------------------------------------------------------------------------ * #
 
+    total_iters = 0
     for epoch in range(opt.num_epoch):
 
         epoch_start_time = time.time()  # timer for entire epoch
@@ -49,13 +49,20 @@ if __name__ == '__main__':
                 visualizer.plot_current_losses(total_iters, losses)
 
             iter_data_time = time.time()
-
         print('End of epoch %d / %d \t Time Taken: %d sec' % (epoch, opt.num_epoch, time.time() - epoch_start_time))
+    model.save_network()
+
+    # * ------------------------------------------------------------------------------------------------------------ * #
+    # *                                   Evaluate and save reconstruction results                                   * #
+    # * ------------------------------------------------------------------------------------------------------------ * #
+
+    model.net.to(model.device)
+    model.load_network()
 
     # evaluate and save result tqdm
     dataset = dataset.dataset
     bsz = model.opt.batch_size
-    for i in tqdm(range(0, len(dataset), bsz)):
+    for i in tqdm(range(0, len(dataset), bsz), desc="Save reconstruction results"):
         batch = []
         for j in range(i, i+bsz):
             if j >= len(dataset):

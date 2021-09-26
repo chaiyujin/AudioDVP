@@ -95,15 +95,42 @@ def prepare_vocaset_videos(output_root, data_root, speaker, training, dest_size=
             pickle.dump(lmks_mapping, fp)
 
 
+def visualize_reconstruction(dataset_dir, speaker):
+    # find clips
+    clip_dirs = []
+    for dirpath, subdirs, _ in os.walk(os.path.join(dataset_dir, speaker)):
+        for subdir in subdirs:
+            if subdir.startswith("clip") and os.path.exists(os.path.join(dirpath, subdir, "crop")):
+                clip_dirs.append(os.path.join(dirpath, subdir))
+    clip_dirs = sorted(clip_dirs)
+
+    for clip_dir in clip_dirs:
+        cmd = (
+            "ffmpeg -hide_banner -y -loglevel error "
+            "-thread_queue_size 8192 -i {0}/render/%05d.png "
+            "-thread_queue_size 8192 -i {0}/crop/%05d.png "
+            "-thread_queue_size 8192 -i {0}/overlay/%05d.png "
+            "-i {0}/audio/audio.aac"
+            "-filter_complex hstack=inputs=3 -vcodec libx264 -preset slower "
+            "-profile:v high -crf 18 -pix_fmt yuv420p {0}/debug.mp4"
+        ).format(clip_dir)
+        assert os.system(cmd) == 0
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output_dir", type=str, default=f"{ROOT}/data/vocaset_video")
+    parser.add_argument("mode", type=str, choices=['prepare', 'visualize_reconstruction'])
+    parser.add_argument("--dataset_dir", type=str, default=f"{ROOT}/data/vocaset_video")
     parser.add_argument("--source_dir", type=str, default="~/assets/vocaset/Data/videos_lmks")
     parser.add_argument("--dest_size", type=int, default=256)
     parser.add_argument("--speakers", type=str, nargs="+", default=["FaceTalk_170725_00137_TA"])
     args = parser.parse_args()
 
-    for spk in args.speakers:
-        prepare_vocaset_videos(args.output_dir, args.source_dir, spk, dest_size=args.dest_size, training=True)
-        prepare_vocaset_videos(args.output_dir, args.source_dir, spk, dest_size=args.dest_size, training=False)
+    if args.mode == "prepare":
+        for spk in args.speakers:
+            prepare_vocaset_videos(args.dataset_dir, args.source_dir, spk, dest_size=args.dest_size, training=True)
+            prepare_vocaset_videos(args.dataset_dir, args.source_dir, spk, dest_size=args.dest_size, training=False)
+    elif args.mode == "visualize_reconsturction":
+        for spk in args.speakers:
+            visualize_reconstruction(args.dataset_dir, spk)

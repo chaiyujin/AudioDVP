@@ -36,7 +36,12 @@ class MultiDataset(BaseDataset):
         gt = self.transforms_gt(image)
         landmark_gt = torch.tensor(self.landmark_dict[image_name])
 
-        return {'input': input, 'gt': gt, 'landmark_gt': landmark_gt, 'image_name': os.path.basename(image_name)}
+        return {
+            'input': input,
+            'gt': gt,
+            'landmark_gt': landmark_gt,
+            'image_name': image_name,
+        }
 
     def load_images_and_landmarks(self):
         # prepare list and dict

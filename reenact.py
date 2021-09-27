@@ -12,24 +12,30 @@ if __name__ == '__main__':
 
     create_dir(os.path.join(opt.src_dir, 'reenact'))
 
-    alpha_list = load_coef(os.path.join(opt.tgt_dir, 'alpha'), opt.test_num)
-    beta_list = load_coef(os.path.join(opt.tgt_dir, 'beta'), opt.test_num)
-    delta_list = load_coef(os.path.join(opt.src_dir, 'reenact_delta'), opt.test_num)
-    gamma_list = load_coef(os.path.join(opt.tgt_dir, 'gamma'), opt.test_num)
-    angle_list = load_coef(os.path.join(opt.tgt_dir, 'rotation'), opt.test_num)
-    translation_list = load_coef(os.path.join(opt.tgt_dir, 'translation'), opt.test_num)
+    # from predicted
+    delta_list = load_coef(os.path.join(opt.src_dir, 'reenact_delta'), opt.test_num, verbose=False)
+
+    # from target video (reconstructed)
+    alpha_list = load_coef(os.path.join(opt.tgt_dir, 'alpha'      ), opt.test_num, verbose=False)
+    beta_list  = load_coef(os.path.join(opt.tgt_dir, 'beta'       ), opt.test_num, verbose=False)
+    gamma_list = load_coef(os.path.join(opt.tgt_dir, 'gamma'      ), opt.test_num, verbose=False)
+    angle_list = load_coef(os.path.join(opt.tgt_dir, 'rotation'   ), opt.test_num, verbose=False)
+    trnsl_list = load_coef(os.path.join(opt.tgt_dir, 'translation'), opt.test_num, verbose=False)
 
     face_model = FaceModel(data_path=opt.matlab_data_path, batch_size=1)
 
     for i in tqdm(range(len(delta_list))):
-        alpha = alpha_list[i + opt.offset].unsqueeze(0).cuda()
-        beta = beta_list[i + opt.offset].unsqueeze(0).cuda()
+        # predicted
         delta = delta_list[i].unsqueeze(0).cuda()
+        # target video (reconstructed)
+        alpha = alpha_list[i + opt.offset].unsqueeze(0).cuda()
+        beta  = beta_list [i + opt.offset].unsqueeze(0).cuda()
         gamma = gamma_list[i + opt.offset].unsqueeze(0).cuda()
-        rotation = angle_list[i + opt.offset].unsqueeze(0).cuda()
-        translation = translation_list[i + opt.offset].unsqueeze(0).cuda()
+        rotat = angle_list[i + opt.offset].unsqueeze(0).cuda()
+        trnsl = trnsl_list[i + opt.offset].unsqueeze(0).cuda()
 
-        render, _, _ = face_model(alpha, delta, beta, rotation, translation, gamma, lower=True)
+        # render
+        render, _, _ = face_model(alpha, delta, beta, rotat, trnsl, gamma, lower=True)
         utils.save_image(render, os.path.join(opt.src_dir, 'reenact', '%05d.png' % (i+1)))
 
         if i >= opt.test_num:

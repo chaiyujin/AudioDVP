@@ -43,7 +43,7 @@ class MultiAudioExprDataset(BaseDataset):
         # stack
         feature = torch.stack(feature_list, dim=0)
         # filename
-        filename = os.path.basename(clip_data['filenames'][index])
+        filename = clip_data['filenames'][index]
 
         if not self.opt.isTrain:
             return {'feature': feature, 'filename': filename}

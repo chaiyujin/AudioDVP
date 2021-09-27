@@ -64,7 +64,8 @@ def test():
 
         features_lengh = (len(features) // 25) * 25
 
-        for i in tqdm(range(features_lengh)):
+        # for i in tqdm(range(features_lengh)):
+        for i in range(features_lengh):
             torch.save(features[i][0].detach().cpu(), os.path.join(config.in_file, 'feature/%05d.pt' % (i+1)))
 
         # print('feature length:',features_lengh)

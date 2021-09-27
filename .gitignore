@@ -30,3 +30,4 @@ renderer/kernels/rasterize_triangles_cpp.*.so
 vendor/ATVGnet/model/*
 
 !.gitkeep
+.nohup

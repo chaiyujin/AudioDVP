@@ -46,7 +46,7 @@ class AudioExpressionDataset(BaseDataset):
 
         feature = torch.stack(feature_list, dim=0)
 
-        filename = os.path.basename(self.filenames[index])
+        filename = self.filenames[index]
 
         if not self.opt.isTrain:
             return {'feature': feature, 'filename': filename}

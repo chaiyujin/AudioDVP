@@ -17,10 +17,10 @@ class SingleDataset(BaseDataset):
         self.landmark_dict = self.load_landmark_dict()
 
         self.transforms_input = transforms.Compose([
-                                    transforms.Resize((224, 224)),
-                                    transforms.ToTensor(),
-                                    transforms.Normalize(mean=[0.5141, 0.4074, 0.3588], std=[1.0, 1.0, 1.0])
-                                ])
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5141, 0.4074, 0.3588], std=[1.0, 1.0, 1.0])
+        ])
 
         self.transforms_gt = transforms.ToTensor()
 
@@ -35,7 +35,7 @@ class SingleDataset(BaseDataset):
         gt = self.transforms_gt(image)
         landmark_gt = torch.tensor(self.landmark_dict[image_name])
 
-        return {'input': input, 'gt': gt, 'landmark_gt': landmark_gt, 'image_name': os.path.basename(image_name)}
+        return {'input': input, 'gt': gt, 'landmark_gt': landmark_gt, 'image_name': image_name}
 
     def load_landmark_dict(self):
         landmark_path = os.path.join(self.opt.data_dir, 'landmark.pkl')

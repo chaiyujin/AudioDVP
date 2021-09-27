@@ -122,8 +122,7 @@ if __name__ == '__main__':
     mouth_triangles = get_mouth_triangles(geo_mean, triangles)
 
     sio.savemat('data/data.mat', {
-                        'triangles': triangles, 'key_points': key_points, 'point_buf': point_buf, 'mouth_triangles': mouth_triangles,
-                        'geo_mean': geo_mean, 'tex_mean': tex_mean,
-                        'id_base': id_base, 'exp_base': exp_base, 'tex_base': tex_base
-                    }
-                )
+        'triangles': triangles, 'key_points': key_points, 'point_buf': point_buf, 'mouth_triangles': mouth_triangles,
+        'geo_mean': geo_mean, 'tex_mean': tex_mean,
+        'id_base': id_base, 'exp_base': exp_base, 'tex_base': tex_base
+    })

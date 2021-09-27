@@ -85,9 +85,6 @@ class AudioExpressionModel:
         with torch.no_grad():
             self.forward()
 
-    def save_delta(self):
-        torch.save(self.delta[0], os.path.join(self.opt.data_dir, 'reenact_delta', self.filename[0]))
-
     def update_learning_rate(self):
         self.scheduler.step()
         lr = self.optimizer.param_groups[0]['lr']
@@ -101,3 +98,8 @@ class AudioExpressionModel:
         load_path = os.path.join(self.opt.net_dir, 'delta_net.pth')
         state_dict = torch.load(load_path, map_location=self.device)
         self.net.load_state_dict(state_dict)
+
+    def save_delta(self):
+        clip_dir = os.path.dirname(os.path.dirname(self.filename[0]))
+        filename = os.path.basename(self.filename[0])
+        torch.save(self.delta[0], os.path.join(clip_dir, 'reenact_delta', filename))

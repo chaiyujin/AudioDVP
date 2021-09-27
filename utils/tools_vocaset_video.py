@@ -108,7 +108,7 @@ def visualize_reconstruction(dataset_dir, speaker):
                 clip_dirs.append(os.path.join(dirpath, subdir))
     clip_dirs = sorted(clip_dirs)
 
-    for clip_dir in tqdm(clip_dirs, desc="Visualize reconstruction"):
+    for clip_dir in tqdm(clip_dirs, desc="[visualize_reconstruction]"):
         if os.path.exists(clip_dir + "-debug.mp4"):
             continue
         cmd = (
@@ -123,20 +123,19 @@ def visualize_reconstruction(dataset_dir, speaker):
         assert os.system(cmd) == 0
 
 
-def build_nfr_dataset(mouth_mask, dataset_dir, speaker):
+def generate_masks(mouth_mask, dataset_dir, speaker):
     data_dir = os.path.join(dataset_dir, speaker)
-    done_flag = os.path.join(data_dir, "nfr", "done.flag")
-    if os.path.exists(done_flag):
-        print("[build_nfr_dataset]: Find {}. It's already done! Skip.".format(done_flag))
-        return
 
     # find training clips
-    clip_dirs = util.find_clip_dirs(data_dir, with_train=True, with_test=False)
+    clip_dirs = util.find_clip_dirs(data_dir, with_train=True, with_test=True)
 
     # generate mask for all clips
-    for clip_dir in tqdm(clip_dirs, desc="[build_nfr_dataset]: Generate masks"):
-        util.create_dir(os.path.join(clip_dir, 'mask'))
+    for clip_dir in tqdm(clip_dirs, desc="[generate_masks]: Generate masks"):
+        done_flag = os.path.join(clip_dir, 'done.mask')
+        if os.path.exists(done_flag):
+            continue
 
+        util.create_dir(os.path.join(clip_dir, 'mask'))
         alpha_list = util.load_coef(os.path.join(clip_dir, 'alpha'      ), verbose=False)
         beta_list  = util.load_coef(os.path.join(clip_dir, 'beta'       ), verbose=False)
         delta_list = util.load_coef(os.path.join(clip_dir, 'delta'      ), verbose=False)
@@ -157,6 +156,20 @@ def build_nfr_dataset(mouth_mask, dataset_dir, speaker):
             mask = cv2.dilate(mask, np.ones((3,3), np.uint8), iterations=4)
 
             cv2.imwrite(os.path.join(clip_dir, 'mask', '%05d.png' % (i+1)), mask)
+        
+        with open(done_flag, "w") as fp:
+            fp.write("")
+
+
+def build_nfr_dataset(dataset_dir, speaker):
+    data_dir = os.path.join(dataset_dir, speaker)
+    done_flag = os.path.join(data_dir, "nfr", "done.flag")
+    if os.path.exists(done_flag):
+        print("[build_nfr_dataset]: Find {}. It's already done! Skip.".format(done_flag))
+        return
+
+    # find training clips
+    clip_dirs = util.find_clip_dirs(data_dir, with_train=True, with_test=False)  # !IMPORTANT: Only training
 
     # create dir for nfr dataset
     util.create_dir(os.path.join(data_dir, 'nfr', 'A', 'train'))
@@ -201,10 +214,11 @@ def build_nfr_dataset(mouth_mask, dataset_dir, speaker):
             if os.path.isfile(path_A) and os.path.isfile(path_B):
                 name_AB = name_A
                 path_AB = os.path.join(image_fold_AB, name_AB)
-                im_A = cv2.imread(path_A, 1) # python2: cv2.CV_LOAD_IMAGE_COLOR; python3: cv2.IMREAD_COLOR
-                im_B = cv2.imread(path_B, 1) # python2: cv2.CV_LOAD_IMAGE_COLOR; python3: cv2.IMREAD_COLOR
+                im_A = cv2.imread(path_A, 1)  # python2: cv2.CV_LOAD_IMAGE_COLOR; python3: cv2.IMREAD_COLOR
+                im_B = cv2.imread(path_B, 1)  # python2: cv2.CV_LOAD_IMAGE_COLOR; python3: cv2.IMREAD_COLOR
                 im_AB = np.concatenate([im_A, im_B], 1)
                 cv2.imwrite(path_AB, im_AB)
+
     # done flag
     with open(done_flag, "w") as fp:
         fp.write("")
@@ -212,8 +226,10 @@ def build_nfr_dataset(mouth_mask, dataset_dir, speaker):
 
 if __name__ == "__main__":
     import argparse
+    choices = ['prepare', 'visualize_reconstruction', 'generate_masks', 'build_nfr_dataset']
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", type=str, choices=['prepare', 'visualize_reconstruction', 'build_nfr_dataset'])
+    parser.add_argument("mode", type=str, choices=choices)
     parser.add_argument("--dataset_dir", type=str, default=f"{ROOT}/data/vocaset_video")
     parser.add_argument("--source_dir", type=str, default="~/assets/vocaset/Data/videos_lmks")
     parser.add_argument("--dest_size", type=int, default=256)
@@ -228,7 +244,10 @@ if __name__ == "__main__":
     elif args.mode == "visualize_reconstruction":
         for spk in args.speakers:
             visualize_reconstruction(args.dataset_dir, spk)
-    elif args.mode == "build_nfr_dataset":
+    elif args.mode == "generate_masks":
         mouth_mask = networks.MouthMask(args)
         for spk in args.speakers:
-            build_nfr_dataset(mouth_mask, args.dataset_dir, spk)
+            generate_masks(mouth_mask, args.dataset_dir, spk)
+    elif args.mode == "build_nfr_dataset":
+        for spk in args.speakers:
+            build_nfr_dataset(args.dataset_dir, spk)

@@ -52,8 +52,16 @@ class MultiDataset(BaseDataset):
         # !IMPORTANT: Load both train and test data for 3D reconstruction!
         clip_dirs = util.find_clip_dirs(self.opt.data_dir, with_train=True, with_test=True)
         
+        self.speaker = None
         # load from each clip
         for clip_dir in clip_dirs:
+            # check only one speaker
+            spk = os.path.basename(os.path.dirname(os.path.dirname(clip_dir)))
+            if self.speaker is not None:
+                assert spk == self.speaker, "Multiple speakers!"
+            else:
+                self.speaker = spk
+            
             img_list = util.get_file_list(os.path.join(clip_dir, 'crop'))
             lmk_path = os.path.join(clip_dir, 'landmark.pkl')
             if not os.path.exists(lmk_path):
@@ -63,3 +71,5 @@ class MultiDataset(BaseDataset):
             # extend
             self.image_list.extend(img_list)
             self.landmark_dict.update(lmk_dict)
+
+        print("MultiDataset has loaded data for speaker: {}".format(self.speaker))

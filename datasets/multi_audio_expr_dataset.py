@@ -65,7 +65,16 @@ class MultiAudioExprDataset(BaseDataset):
         self.clips = list()
         self.coordinates = list()
 
+        self.speaker = None
+
         def _load_dir(clip_dir):
+            # check only one speaker
+            spk = os.path.basename(os.path.dirname(os.path.dirname(clip_dir)))
+            if self.speaker is not None:
+                assert spk == self.speaker, "Multiple speakers!"
+            else:
+                self.speaker = spk
+
             ret = dict()
             ret['feature_list'] = util.load_coef(os.path.join(clip_dir, 'feature'), verbose=False)
             ret['filenames']    = util.get_file_list(os.path.join(clip_dir, 'feature'))
@@ -92,3 +101,5 @@ class MultiAudioExprDataset(BaseDataset):
         for clip_dir in clip_dirs:
             # print(clip_dir)
             _load_dir(clip_dir)
+
+        print("MultiAudioExprDataset has loaded data for speaker: {}".format(self.speaker))

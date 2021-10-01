@@ -47,7 +47,11 @@ function RUN_VOCASET() {
   DRAW_DIVIDER;
 
   # prepare data
-  python3 utils/tools_vocaset_video.py prepare --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER
+  python3 utils/tools_vocaset_video.py prepare --dataset_dir $DATA_DIR --speakers $SPEAKER
+  if [[ $? != 0 ]]; then
+    printf "${ERROR} Failed to prepare data!"
+    exit 1
+  fi
 
   # *-------------------------------------------- 3D face reconstruction --------------------------------------------* #
 
@@ -66,6 +70,10 @@ function RUN_VOCASET() {
       --data_dir "$DATA_DIR/$SPEAKER" \
       --net_dir $NET_DIR \
     ;
+    if [[ $? != 0 ]]; then
+      printf "${ERROR} Failed to reconstruct 3D!"
+      exit 1
+    fi
     cd ${CWD}
   else
     printf "3D Face Reconstruction is already trained, checkpoint is found at: ${NET_DIR}/recons3d_net.pth\n"
@@ -73,6 +81,10 @@ function RUN_VOCASET() {
 
   # generate masks
   python3 utils/tools_vocaset_video.py generate_masks --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER
+  if [[ $? != 0 ]]; then
+    printf "${ERROR} Failed to generate masks!"
+    exit 1
+  fi
 
   # visualize by generating debug videos
   python3 utils/tools_vocaset_video.py visualize_reconstruction --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER
@@ -95,6 +107,10 @@ function RUN_VOCASET() {
       --data_dir "$DATA_DIR/$SPEAKER" \
       --net_dir $NET_DIR \
     ;
+    if [[ $? != 0 ]]; then
+      printf "${ERROR} Failed to train Audio2Expression!"
+      exit 1
+    fi
     cd ${CWD}
   else
     printf "Audio2Expression is already trained, checkpoint is found at: ${NET_DIR}/delta_net.pth\n"
@@ -120,6 +136,10 @@ function RUN_VOCASET() {
       --num_threads 4 --batch_size 16 --lambda_L1 100 \
       --n_epochs ${EPOCH_NFR} --n_epochs_decay 0 \
     ;
+    if [[ $? != 0 ]]; then
+      printf "${ERROR} Failed to train NFR!"
+      exit 1
+    fi
     cd ${CWD}
 
     # remove other checkpoints of nfr

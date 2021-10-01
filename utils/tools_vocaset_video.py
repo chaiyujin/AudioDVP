@@ -6,6 +6,7 @@ import cv2
 import toml
 import pickle
 import numpy as np
+import face_recognition
 from glob import glob
 from tqdm import tqdm
 from shutil import rmtree
@@ -13,6 +14,36 @@ from models import networks
 from utils import util
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def calc_bbox(lmks_list):
+    """Batch infer of face location, batch_size should be factor of total frame number."""
+    x_sum, y_sum, w_sum, h_sum = 0, 0, 0, 0
+
+    for lmks in lmks_list:
+        x = lmks[..., 0].min()
+        y = lmks[..., 1].min()
+        w = lmks[..., 0].max() - x
+        h = lmks[..., 1].max() - y
+        x_sum += x
+        y_sum += y
+        w_sum += w
+        h_sum += h
+    
+    x = x_sum / len(lmks_list)
+    y = y_sum / len(lmks_list)
+    w = w_sum / len(lmks_list)
+    h = h_sum / len(lmks_list)
+
+    cx = x + w // 2
+    cy = y + h // 2
+    a = int(max(w, h) * 1.5 // 2)
+    x = int(max(cx - a, 0))
+    y = int(max(cy - a, 0))
+    w = a * 2
+    h = a * 2
+
+    return x, y, w, h
 
 
 def prepare_vocaset_video(output_root, data_root, speaker, training, dest_size=256, debug=False):
@@ -58,12 +89,14 @@ def prepare_vocaset_video(output_root, data_root, speaker, training, dest_size=2
                 ts = i * 1000.0 / lmks_data['fps']
             return ts
 
+        # find bbox first
+        all_lmks = np.asarray([x['points'] for x in lmks_data["frames"]], dtype=np.float32)
+        x, y, w, h = calc_bbox(all_lmks)
+
         img_list = sorted(glob(f"{out_dir}/full/*.png"))
         for i_frm, img_path in enumerate(img_list):
             save_path = f"{out_dir}/crop/{os.path.basename(img_path)}"
             img = cv2.imread(img_path)
-            img = cv2.resize(img, (dest_size, dest_size))
-            cv2.imwrite(save_path, img)
             # fetch lmk
             ts = i_frm * 1000.0 / 25.0 - 60  # HACK
             while i_lmk < len(lmks_data['frames']) and _i_lmk_to_ts(i_lmk) <= ts:
@@ -81,10 +114,18 @@ def prepare_vocaset_video(output_root, data_root, speaker, training, dest_size=2
             a = np.clip(a, 0, 1)
             assert 0 <= a <= 1
             pts = pts0 * (1-a) + pts1 * a
-            pts[:, 0] = pts[:, 0] / lmks_data['resolution'][0] * dest_size
-            pts[:, 1] = pts[:, 1] / lmks_data['resolution'][1] * dest_size
+            # crop
+            img = img[y:y+h, x:x+w]
+            pts[:, 0] -= x
+            pts[:, 1] -= y
+            assert pts.min() >= 0, "Landmarks out of bbox"
+            # resize
+            img = cv2.resize(img, (dest_size, dest_size))
+            pts[:, 0] = pts[:, 0] / w * dest_size
+            pts[:, 1] = pts[:, 1] / h * dest_size
             # update mapping
             lmks_mapping[save_path] = pts
+            cv2.imwrite(save_path, img)
             # debug
             if debug:
                 for p in pts:

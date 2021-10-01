@@ -5,6 +5,7 @@ function DRAW_DIVIDER() {
 function RUN_VOCASET() {
   ERROR='\033[0;31m[ERROR]\033[0m'
 
+  local CWD=${PWD}
   local SPEAKER="FaceTalk_170725_00137_TA"
   local EPOCH_NFR=200
   local DATA_DIR=data/vocaset
@@ -46,7 +47,7 @@ function RUN_VOCASET() {
   DRAW_DIVIDER;
 
   # prepare data
-  python3 utils/tools_vocaset_video.py prepare --dataset_dir $DATA_DIR --speakers $SPEAKER
+  python3 utils/tools_vocaset_video.py prepare --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER
 
   # *-------------------------------------------- 3D face reconstruction --------------------------------------------* #
 
@@ -65,15 +66,16 @@ function RUN_VOCASET() {
       --data_dir "$DATA_DIR/$SPEAKER" \
       --net_dir $NET_DIR \
     ;
+    cd ${CWD}
   else
     printf "3D Face Reconstruction is already trained, checkpoint is found at: ${NET_DIR}/recons3d_net.pth\n"
   fi
 
   # generate masks
-  python3 utils/tools_vocaset_video.py generate_masks --dataset_dir $DATA_DIR --speakers $SPEAKER
+  python3 utils/tools_vocaset_video.py generate_masks --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER
 
   # visualize by generating debug videos
-  python3 utils/tools_vocaset_video.py visualize_reconstruction --dataset_dir $DATA_DIR --speakers $SPEAKER
+  python3 utils/tools_vocaset_video.py visualize_reconstruction --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER
 
   # *-------------------------------------------- Train Audio2Expression --------------------------------------------* #
 
@@ -93,6 +95,7 @@ function RUN_VOCASET() {
       --data_dir "$DATA_DIR/$SPEAKER" \
       --net_dir $NET_DIR \
     ;
+    cd ${CWD}
   else
     printf "Audio2Expression is already trained, checkpoint is found at: ${NET_DIR}/delta_net.pth\n"
   fi
@@ -102,7 +105,7 @@ function RUN_VOCASET() {
   DRAW_DIVIDER;
 
   # data generation
-  python3 utils/tools_vocaset_video.py build_nfr_dataset --dataset_dir $DATA_DIR --speakers $SPEAKER
+  python3 utils/tools_vocaset_video.py build_nfr_dataset --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER
 
   # training
   if [ ! -d "${NET_DIR}/nfr" ]; then
@@ -117,6 +120,7 @@ function RUN_VOCASET() {
       --num_threads 4 --batch_size 16 --lambda_L1 100 \
       --n_epochs ${EPOCH_NFR} --n_epochs_decay 0 \
     ;
+    cd ${CWD}
 
     # remove other checkpoints of nfr
     REGEX_CKPT=".*_net_.*"
@@ -133,7 +137,9 @@ function RUN_VOCASET() {
         rm "$entry"
       fi
     done
-  elif [ ! -f "${NET_DIR}/nfr/${EPOCH_NFR}_net_G.pth" ]; then
+  fi
+  
+  if [ ! -f "${NET_DIR}/nfr/${EPOCH_NFR}_net_G.pth" ]; then
     printf "${ERROR} Neural Face Renderer is trained, but we failed to find expected checkpoint at: ${NET_DIR}/nfr/${EPOCH_NFR}_net_G.pth\n"
     exit 1
   else
@@ -157,6 +163,7 @@ function RUN_VOCASET() {
 
     if [ -d $audio_dir ]; then
       echo "Generating results for $audio_dir"
+      cd ${CWD}
 
       # extract high-level feature from test audio
       mkdir -p $audio_dir/feature

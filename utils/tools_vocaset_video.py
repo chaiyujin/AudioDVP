@@ -155,7 +155,8 @@ def generate_masks(mouth_mask, dataset_dir, speaker):
             mask = mask.squeeze(0).detach().cpu().permute(1, 2, 0).numpy() * 255.0
             mask = cv2.dilate(mask, np.ones((3,3), np.uint8), iterations=4)
 
-            cv2.imwrite(os.path.join(clip_dir, 'mask', '%05d.png' % (i+1)), mask)
+            save_path = os.path.join(clip_dir, 'mask', '%05d.png' % (i+1))
+            cv2.imwrite(save_path, mask)
         
         with open(done_flag, "w") as fp:
             fp.write("")

@@ -89,9 +89,9 @@ def prepare_vocaset_video(output_root, data_root, speaker, training, dest_size=2
                 ts = i * 1000.0 / lmks_data['fps']
             return ts
 
-        # find bbox first
-        all_lmks = np.asarray([x['points'] for x in lmks_data["frames"]], dtype=np.float32)
-        x, y, w, h = calc_bbox(all_lmks)
+        # # find bbox first
+        # all_lmks = np.asarray([x['points'] for x in lmks_data["frames"]], dtype=np.float32)
+        # x, y, w, h = calc_bbox(all_lmks)
 
         img_list = sorted(glob(f"{out_dir}/full/*.png"))
         for i_frm, img_path in enumerate(img_list):
@@ -114,15 +114,17 @@ def prepare_vocaset_video(output_root, data_root, speaker, training, dest_size=2
             a = np.clip(a, 0, 1)
             assert 0 <= a <= 1
             pts = pts0 * (1-a) + pts1 * a
-            # crop
-            img = img[y:y+h, x:x+w]
-            pts[:, 0] -= x
-            pts[:, 1] -= y
-            assert pts.min() >= 0, "Landmarks out of bbox"
+
+            # # crop
+            # img = img[y:y+h, x:x+w]
+            # pts[:, 0] -= x
+            # pts[:, 1] -= y
+            # assert pts.min() >= 0, "Landmarks out of bbox"
+
             # resize
+            pts[:, 0] = pts[:, 0] / img.shape[1] * dest_size
+            pts[:, 1] = pts[:, 1] / img.shape[0] * dest_size
             img = cv2.resize(img, (dest_size, dest_size))
-            pts[:, 0] = pts[:, 0] / w * dest_size
-            pts[:, 1] = pts[:, 1] / h * dest_size
             # update mapping
             lmks_mapping[save_path] = pts
             cv2.imwrite(save_path, img)
@@ -273,16 +275,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", type=str, choices=choices)
     parser.add_argument("--dataset_dir", type=str, default=f"{ROOT}/data/vocaset_video")
-    parser.add_argument("--source_dir", type=str, default="~/assets/vocaset/Data/videos_lmks")
+    parser.add_argument("--source_dir", type=str, default="~/assets/vocaset/Data/videos_lmks_crop")
     parser.add_argument("--dest_size", type=int, default=256)
     parser.add_argument('--matlab_data_path', type=str, default='renderer/data/data.mat')
     parser.add_argument("--speakers", type=str, nargs="+", default=["FaceTalk_170725_00137_TA"])
+    parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
     if args.mode == "prepare":
         for spk in args.speakers:
-            prepare_vocaset_video(args.dataset_dir, args.source_dir, spk, dest_size=args.dest_size, training=True)
-            prepare_vocaset_video(args.dataset_dir, args.source_dir, spk, dest_size=args.dest_size, training=False)
+            prepare_vocaset_video(args.dataset_dir, args.source_dir, spk, dest_size=args.dest_size, debug=args.debug, training=True)
+            prepare_vocaset_video(args.dataset_dir, args.source_dir, spk, dest_size=args.dest_size, debug=args.debug, training=False)
     elif args.mode == "visualize_reconstruction":
         for spk in args.speakers:
             visualize_reconstruction(args.dataset_dir, spk)

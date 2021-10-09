@@ -9,6 +9,7 @@ function RUN_VOCASET() {
   local SPEAKER="FaceTalk_170725_00137_TA"
   local EPOCH_NFR=200
   local DATA_DIR=data/vocaset
+  local DEBUG=""
 
   # Override from arguments
   for var in "$@"
@@ -17,6 +18,8 @@ function RUN_VOCASET() {
       SPEAKER="${BASH_REMATCH[1]}"
     elif [[ $var =~ --epoch_nfr\=(.*) ]]; then
       EPOCH_NFR="${BASH_REMATCH[1]}"
+    elif [[ $var =~ --debug ]]; then
+      DEBUG="--debug"
     fi
   done
 
@@ -47,7 +50,7 @@ function RUN_VOCASET() {
   DRAW_DIVIDER;
 
   # prepare data
-  python3 utils/tools_vocaset_video.py prepare --dataset_dir $DATA_DIR --speakers $SPEAKER
+  python3 utils/tools_vocaset_video.py prepare --dataset_dir $DATA_DIR --speakers $SPEAKER ${DEBUG}
   if [[ $? != 0 ]]; then
     printf "${ERROR} Failed to prepare data!"
     exit 1
@@ -80,14 +83,14 @@ function RUN_VOCASET() {
   fi
 
   # generate masks
-  python3 utils/tools_vocaset_video.py generate_masks --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER
+  python3 utils/tools_vocaset_video.py generate_masks --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER ${DEBUG}
   if [[ $? != 0 ]]; then
     printf "${ERROR} Failed to generate masks!"
     exit 1
   fi
 
   # visualize by generating debug videos
-  python3 utils/tools_vocaset_video.py visualize_reconstruction --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER
+  python3 utils/tools_vocaset_video.py visualize_reconstruction --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER ${DEBUG}
 
   # *-------------------------------------------- Train Audio2Expression --------------------------------------------* #
 
@@ -121,7 +124,7 @@ function RUN_VOCASET() {
   DRAW_DIVIDER;
 
   # data generation
-  python3 utils/tools_vocaset_video.py build_nfr_dataset --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER
+  python3 utils/tools_vocaset_video.py build_nfr_dataset --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER ${DEBUG}
 
   # training
   if [ ! -d "${NET_DIR}/nfr" ]; then
@@ -232,4 +235,10 @@ function RUN_VOCASET() {
 }
 
 # RUN_VOCASET --speaker=FaceTalk_170725_00137_TA --epoch_nfr=200;
-RUN_VOCASET --speaker=FaceTalk_170908_03277_TA --epoch_nfr=200;
+# RUN_VOCASET --speaker=FaceTalk_170908_03277_TA --epoch_nfr=200;
+# RUN_VOCASET --speaker=FaceTalk_170908_03277_TA --epoch_nfr=200;
+
+RUN_VOCASET --epoch_nfr=200 --speaker=FaceTalk_170811_03275_TA --debug
+# RUN_VOCASET --epoch_nfr=200 --speaker=FaceTalk_170904_03276_TA
+# RUN_VOCASET --epoch_nfr=200 --speaker=FaceTalk_170908_03277_TA
+# RUN_VOCASET --epoch_nfr=200 --speaker=FaceTalk_170913_03279_TA

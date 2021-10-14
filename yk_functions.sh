@@ -110,7 +110,7 @@ function PrepareData() {
     --dataset_mode multi \
     --num_epoch ${EPOCH} \
     --lambda_photo 2.0 \
-    --lambda_land 1.0 \
+    --lambda_land 0.1 \
     --serial_batches False \
     --display_freq 400 \
     --print_freq 400 \

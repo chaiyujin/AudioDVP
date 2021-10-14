@@ -1,7 +1,5 @@
 import os
 import sys
-sys.path.append(".")
-
 import cv2
 import toml
 import pickle
@@ -13,7 +11,7 @@ from shutil import rmtree
 from models import networks
 from utils import util
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 def calc_bbox(lmks_list):
@@ -46,7 +44,7 @@ def calc_bbox(lmks_list):
     return x, y, w, h
 
 
-def prepare_vocaset_video(output_root, data_root, speaker, training, dest_size=256, debug=False):
+def prepare_vocaset(output_root, data_root, speaker, training, dest_size=256, debug=False):
     output_root = os.path.expanduser(output_root)
     output_root = os.path.join(output_root, speaker, "train" if training else "test")
     data_root = os.path.expanduser(data_root)
@@ -156,9 +154,9 @@ def visualize_reconstruction(dataset_dir, speaker):
             continue
         cmd = (
             "ffmpeg -hide_banner -n -loglevel error "
-            "-thread_queue_size 8192 -i {0}/render/%05d.png "
+            "-thread_queue_size 8192 -i {0}/reconstructed/render/%05d.png "
+            "-thread_queue_size 8192 -i {0}/reconstructed/overlay/%05d.png "
             "-thread_queue_size 8192 -i {0}/crop/%05d.png "
-            "-thread_queue_size 8192 -i {0}/overlay/%05d.png "
             "-i {0}/audio/audio.wav "
             "-filter_complex hstack=inputs=3 -vcodec libx264 -preset slower "
             "-profile:v high -crf 18 -pix_fmt yuv420p {0}-debug.mp4"
@@ -179,12 +177,12 @@ def generate_masks(mouth_mask, dataset_dir, speaker):
             continue
 
         util.create_dir(os.path.join(clip_dir, 'mask'))
-        alpha_list = util.load_coef(os.path.join(clip_dir, 'alpha'      ), verbose=False)
-        beta_list  = util.load_coef(os.path.join(clip_dir, 'beta'       ), verbose=False)
-        delta_list = util.load_coef(os.path.join(clip_dir, 'delta'      ), verbose=False)
-        gamma_list = util.load_coef(os.path.join(clip_dir, 'gamma'      ), verbose=False)
-        angle_list = util.load_coef(os.path.join(clip_dir, 'rotation'   ), verbose=False)
-        trnsl_list = util.load_coef(os.path.join(clip_dir, 'translation'), verbose=False)
+        alpha_list = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'alpha'      ), verbose=False)
+        beta_list  = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'beta'       ), verbose=False)
+        delta_list = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'delta'      ), verbose=False)
+        gamma_list = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'gamma'      ), verbose=False)
+        angle_list = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'rotation'   ), verbose=False)
+        trnsl_list = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'translation'), verbose=False)
 
         for i in tqdm(range(len(alpha_list)), leave=False):
             alpha = alpha_list[i].unsqueeze(0).cuda()
@@ -224,7 +222,7 @@ def build_nfr_dataset(dataset_dir, speaker):
     for clip_dir in clip_dirs:
         masks  .extend(util.get_file_list(os.path.join(clip_dir, 'mask')))
         crops  .extend(util.get_file_list(os.path.join(clip_dir, 'crop')))
-        renders.extend(util.get_file_list(os.path.join(clip_dir, 'render')))
+        renders.extend(util.get_file_list(os.path.join(clip_dir, 'reconstructed', 'render')))
 
     # save into nfr dataset
     for i in tqdm(range(len(masks)), desc="[build_nfr_dataset]: Write into A/train or B/train"):
@@ -270,7 +268,7 @@ def build_nfr_dataset(dataset_dir, speaker):
 
 if __name__ == "__main__":
     import argparse
-    choices = ['prepare', 'visualize_reconstruction', 'generate_masks', 'build_nfr_dataset']
+    choices = ['prepare_vocaset', 'visualize_reconstruction', 'generate_masks', 'build_nfr_dataset']
 
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", type=str, choices=choices)
@@ -282,10 +280,10 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
-    if args.mode == "prepare":
+    if args.mode == "prepare_vocaset":
         for spk in args.speakers:
-            prepare_vocaset_video(args.dataset_dir, args.source_dir, spk, dest_size=args.dest_size, debug=args.debug, training=True)
-            prepare_vocaset_video(args.dataset_dir, args.source_dir, spk, dest_size=args.dest_size, debug=args.debug, training=False)
+            prepare_vocaset(args.dataset_dir, args.source_dir, spk, dest_size=args.dest_size, debug=args.debug, training=True)
+            prepare_vocaset(args.dataset_dir, args.source_dir, spk, dest_size=args.dest_size, debug=args.debug, training=False)
     elif args.mode == "visualize_reconstruction":
         for spk in args.speakers:
             visualize_reconstruction(args.dataset_dir, spk)

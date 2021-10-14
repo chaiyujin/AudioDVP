@@ -109,23 +109,24 @@ class ResnetModel:
 
         for i in range(self.opt.batch_size):
             clip_dir = os.path.dirname(os.path.dirname(self.image_name[i]))
+            save_dir = os.path.join(clip_dir, "reconstructed")
             img_name = os.path.splitext(os.path.basename(self.image_name[i]))[0]
-            if not os.path.exists(os.path.join(clip_dir, 'translation')):
-                create_dir(os.path.join(clip_dir, 'render'))
-                create_dir(os.path.join(clip_dir, 'overlay'))
-                create_dir(os.path.join(clip_dir, 'alpha'))
-                create_dir(os.path.join(clip_dir, 'beta'))
-                create_dir(os.path.join(clip_dir, 'delta'))
-                create_dir(os.path.join(clip_dir, 'gamma'))
-                create_dir(os.path.join(clip_dir, 'rotation'))
-                create_dir(os.path.join(clip_dir, 'translation'))
+            if not os.path.exists(os.path.join(save_dir, 'translation')):
+                create_dir(os.path.join(save_dir, 'render'))
+                create_dir(os.path.join(save_dir, 'overlay'))
+                create_dir(os.path.join(save_dir, 'alpha'))
+                create_dir(os.path.join(save_dir, 'beta'))
+                create_dir(os.path.join(save_dir, 'delta'))
+                create_dir(os.path.join(save_dir, 'gamma'))
+                create_dir(os.path.join(save_dir, 'rotation'))
+                create_dir(os.path.join(save_dir, 'translation'))
 
-            utils.save_image(self.render[i],  os.path.join(clip_dir, 'render',  img_name + ".png"))
-            utils.save_image(self.overlay[i], os.path.join(clip_dir, 'overlay', img_name + ".png"))
+            utils.save_image(self.render[i],  os.path.join(save_dir, 'render',  img_name + ".png"))
+            utils.save_image(self.overlay[i], os.path.join(save_dir, 'overlay', img_name + ".png"))
 
-            torch.save(self.alpha[0].detach().cpu(),       os.path.join(clip_dir, 'alpha',       img_name + '.pt'))
-            torch.save(self.beta[0].detach().cpu(),        os.path.join(clip_dir, 'beta',        img_name + '.pt'))
-            torch.save(self.delta[i].detach().cpu(),       os.path.join(clip_dir, 'delta',       img_name + '.pt'))
-            torch.save(self.gamma[i].detach().cpu(),       os.path.join(clip_dir, 'gamma',       img_name + '.pt'))
-            torch.save(self.rotation[i].detach().cpu(),    os.path.join(clip_dir, 'rotation',    img_name + '.pt'))
-            torch.save(self.translation[i].detach().cpu(), os.path.join(clip_dir, 'translation', img_name + '.pt'))
+            torch.save(self.alpha[0].detach().cpu(),       os.path.join(save_dir, 'alpha',       img_name + '.pt'))
+            torch.save(self.beta[0].detach().cpu(),        os.path.join(save_dir, 'beta',        img_name + '.pt'))
+            torch.save(self.delta[i].detach().cpu(),       os.path.join(save_dir, 'delta',       img_name + '.pt'))
+            torch.save(self.gamma[i].detach().cpu(),       os.path.join(save_dir, 'gamma',       img_name + '.pt'))
+            torch.save(self.rotation[i].detach().cpu(),    os.path.join(save_dir, 'rotation',    img_name + '.pt'))
+            torch.save(self.translation[i].detach().cpu(), os.path.join(save_dir, 'translation', img_name + '.pt'))

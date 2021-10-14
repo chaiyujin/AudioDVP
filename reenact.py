@@ -16,11 +16,11 @@ if __name__ == '__main__':
     delta_list = load_coef(os.path.join(opt.src_dir, 'reenact_delta'), opt.test_num, verbose=False)
 
     # from target video (reconstructed)
-    alpha_list = load_coef(os.path.join(opt.tgt_dir, 'alpha'      ), opt.test_num, verbose=False)
-    beta_list  = load_coef(os.path.join(opt.tgt_dir, 'beta'       ), opt.test_num, verbose=False)
-    gamma_list = load_coef(os.path.join(opt.tgt_dir, 'gamma'      ), opt.test_num, verbose=False)
-    angle_list = load_coef(os.path.join(opt.tgt_dir, 'rotation'   ), opt.test_num, verbose=False)
-    trnsl_list = load_coef(os.path.join(opt.tgt_dir, 'translation'), opt.test_num, verbose=False)
+    alpha_list = load_coef(os.path.join(opt.tgt_dir, 'reconstructed', 'alpha'      ), opt.test_num, verbose=False)
+    beta_list  = load_coef(os.path.join(opt.tgt_dir, 'reconstructed', 'beta'       ), opt.test_num, verbose=False)
+    gamma_list = load_coef(os.path.join(opt.tgt_dir, 'reconstructed', 'gamma'      ), opt.test_num, verbose=False)
+    angle_list = load_coef(os.path.join(opt.tgt_dir, 'reconstructed', 'rotation'   ), opt.test_num, verbose=False)
+    trnsl_list = load_coef(os.path.join(opt.tgt_dir, 'reconstructed', 'translation'), opt.test_num, verbose=False)
 
     face_model = FaceModel(data_path=opt.matlab_data_path, batch_size=1)
 

@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import cv2
 import toml
@@ -47,97 +48,131 @@ def calc_bbox(lmks_list):
 def prepare_vocaset(output_root, data_root, speaker, training, dest_size=256, debug=False):
     output_root = os.path.expanduser(output_root)
     output_root = os.path.join(output_root, speaker, "train" if training else "test")
+
     data_root = os.path.expanduser(data_root)
     data_root = os.path.join(data_root, speaker)
 
     seq_range = list(range(0, 20)) if training else list(range(20, 40))
-    for i_seq in tqdm(seq_range, desc=f"[prepare_vocaset_video]: {speaker}/{seq_range[0]}-{seq_range[-1]}"):
-        out_dir = os.path.join(output_root, f"clip{i_seq:02d}")
-        # skip if already done before
-        if os.path.exists(os.path.join(out_dir, "landmark.pkl")):
-            continue
-
-        # prepare output dirs
-        os.makedirs(os.path.join(out_dir, "full"), exist_ok=True)
-        os.makedirs(os.path.join(out_dir, "crop"), exist_ok=True)
-        os.makedirs(os.path.join(out_dir, "audio"), exist_ok=True)
-        os.makedirs(os.path.join(out_dir, "feature"), exist_ok=True)
-
+    for i_seq in tqdm(seq_range, desc=f"[prepare_vocaset]: {speaker}/{seq_range[0]}-{seq_range[-1]}"):
         # data source
         prefix = os.path.join(data_root, f"sentence{i_seq+1:02d}")
         vpath = prefix + ".mp4"
         lpath = prefix + "-lmks-ibug-68.toml"
+        # output dir
+        out_dir = os.path.join(output_root, f"clip-sentence{i_seq+1:02d}")
+        # preprocess
+        _preprocess_video(out_dir, vpath, lpath, dest_size, debug)
 
-        # 1. -> 25 fps images and audio
-        assert os.system(f"ffmpeg -loglevel error -hide_banner -y -i {vpath} -r 25 {out_dir}/full/%05d.png") == 0
-        assert os.system(f"ffmpeg -loglevel error -hide_banner -y -i {vpath} {out_dir}/audio/audio.wav") == 0
 
-        # 2. audio fetures
-        assert os.system(f"{sys.executable} {ROOT}/vendor/ATVGnet/code/test.py -i {out_dir}/") == 0
+def prepare_celebtalk(output_root, data_root, speaker, training, dest_size=256, debug=False):
+    output_root = os.path.expanduser(output_root)
+    output_root = os.path.join(output_root, speaker, "train" if training else "test")
 
-        # 3. resize and dump landmarks
-        with open(lpath) as fp:
-            lmks_data = toml.load(fp)
-        lmks_mapping = dict()
-        i_lmk = 0
+    data_root = os.path.expanduser(data_root)
+    data_root = os.path.join(data_root, "ProcessTasks", speaker, "clips_cropped")
 
-        def _i_lmk_to_ts(i):
-            ts = lmks_data['frames'][i]['ms']
-            if ts <= 0:
-                ts = i * 1000.0 / lmks_data['fps']
-            return ts
-
-        # # find bbox first
-        # all_lmks = np.asarray([x['points'] for x in lmks_data["frames"]], dtype=np.float32)
-        # x, y, w, h = calc_bbox(all_lmks)
-
-        img_list = sorted(glob(f"{out_dir}/full/*.png"))
-        for i_frm, img_path in enumerate(img_list):
-            save_path = f"{out_dir}/crop/{os.path.basename(img_path)}"
-            img = cv2.imread(img_path)
-            # fetch lmk
-            ts = i_frm * 1000.0 / 25.0 - 60  # HACK
-            while i_lmk < len(lmks_data['frames']) and _i_lmk_to_ts(i_lmk) <= ts:
-                i_lmk += 1
-            jframe = np.clip(i_lmk, 0, len(lmks_data['frames']) - 1)
-            iframe = np.clip(i_lmk - 1, 0, len(lmks_data['frames']) - 1)
-            pts0 = np.asarray(lmks_data['frames'][iframe]['points'], dtype=np.float32)
-            pts1 = np.asarray(lmks_data['frames'][jframe]['points'], dtype=np.float32)
-            ts0 = _i_lmk_to_ts(iframe)
-            ts1 = _i_lmk_to_ts(jframe)
-            if np.isclose(ts0, ts1):
-                a = 1
+    tasks = []
+    for cur_root, _, files in os.walk(data_root):
+        for fpath in files:
+            if training:
+                if re.match(r"trn-\d+\.mp4", fpath) is not None:
+                    tasks.append(os.path.join(cur_root, fpath))
             else:
-                a = (ts - ts0) / (ts1 - ts0)
-            a = np.clip(a, 0, 1)
-            assert 0 <= a <= 1
-            pts = pts0 * (1-a) + pts1 * a
+                if re.match(r"tst-\d+\.mp4", fpath) is not None:
+                    tasks.append(os.path.join(cur_root, fpath))
+        break
 
-            # # crop
-            # img = img[y:y+h, x:x+w]
-            # pts[:, 0] -= x
-            # pts[:, 1] -= y
-            # assert pts.min() >= 0, "Landmarks out of bbox"
+    for vpath in tqdm(tasks, desc=f"[prepare_celebtalk]: {speaker}"):
+        # data source
+        lpath = os.path.splitext(vpath)[0] + "-lmks-ibug-68.toml"
+        # output dir
+        seq_id = os.path.basename(os.path.splitext(vpath)[0])
+        out_dir = os.path.join(output_root, f"clip-{seq_id}")
+        # preprocess
+        _preprocess_video(out_dir, vpath, lpath, dest_size, debug)
+       
 
-            # resize
-            pts[:, 0] = pts[:, 0] / img.shape[1] * dest_size
-            pts[:, 1] = pts[:, 1] / img.shape[0] * dest_size
-            img = cv2.resize(img, (dest_size, dest_size))
-            # update mapping
-            lmks_mapping[save_path] = pts
-            cv2.imwrite(save_path, img)
-            # debug
-            if debug:
-                for p in pts:
-                    c = (int(p[0]), int(p[1]))
-                    cv2.circle(img, c, 2, (0, 255, 0), -1)
-                cv2.imshow('img', img)
-                cv2.waitKey(1)
-        # remove full
-        rmtree(f"{out_dir}/full")
-        # save landmarks
-        with open(os.path.join(out_dir, "landmark.pkl"), "wb") as fp:
-            pickle.dump(lmks_mapping, fp)
+def _preprocess_video(out_dir, vpath, lpath, dest_size, debug):
+    # skip if already done before
+    if os.path.exists(os.path.join(out_dir, "landmark.pkl")):
+        return
+
+    # prepare output dirs
+    os.makedirs(os.path.join(out_dir, "full"), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, "crop"), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, "audio"), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, "feature"), exist_ok=True)
+
+    # 1. -> 25 fps images and audio
+    assert os.system(f"ffmpeg -loglevel error -hide_banner -y -i {vpath} -r 25 {out_dir}/full/%05d.png") == 0
+    assert os.system(f"ffmpeg -loglevel error -hide_banner -y -i {vpath} {out_dir}/audio/audio.wav") == 0
+
+    # 2. audio fetures
+    assert os.system(f"{sys.executable} {ROOT}/vendor/ATVGnet/code/test.py -i {out_dir}/") == 0
+
+    # 3. resize and dump landmarks
+    with open(lpath) as fp:
+        lmks_data = toml.load(fp)
+    lmks_mapping = dict()
+    i_lmk = 0
+
+    def _i_lmk_to_ts(i):
+        ts = lmks_data['frames'][i]['ms']
+        if ts <= 0:
+            ts = i * 1000.0 / lmks_data['fps']
+        return ts
+
+    # # find bbox first
+    # all_lmks = np.asarray([x['points'] for x in lmks_data["frames"]], dtype=np.float32)
+    # x, y, w, h = calc_bbox(all_lmks)
+
+    img_list = sorted(glob(f"{out_dir}/full/*.png"))
+    for i_frm, img_path in enumerate(img_list):
+        save_path = f"{out_dir}/crop/{os.path.basename(img_path)}"
+        img = cv2.imread(img_path)
+        # fetch lmk
+        ts = i_frm * 1000.0 / 25.0 - 60  # HACK
+        while i_lmk < len(lmks_data['frames']) and _i_lmk_to_ts(i_lmk) <= ts:
+            i_lmk += 1
+        jframe = np.clip(i_lmk, 0, len(lmks_data['frames']) - 1)
+        iframe = np.clip(i_lmk - 1, 0, len(lmks_data['frames']) - 1)
+        pts0 = np.asarray(lmks_data['frames'][iframe]['points'], dtype=np.float32)
+        pts1 = np.asarray(lmks_data['frames'][jframe]['points'], dtype=np.float32)
+        ts0 = _i_lmk_to_ts(iframe)
+        ts1 = _i_lmk_to_ts(jframe)
+        if np.isclose(ts0, ts1):
+            a = 1
+        else:
+            a = (ts - ts0) / (ts1 - ts0)
+        a = np.clip(a, 0, 1)
+        assert 0 <= a <= 1
+        pts = pts0 * (1-a) + pts1 * a
+
+        # # crop
+        # img = img[y:y+h, x:x+w]
+        # pts[:, 0] -= x
+        # pts[:, 1] -= y
+        # assert pts.min() >= 0, "Landmarks out of bbox"
+
+        # resize
+        pts[:, 0] = pts[:, 0] / img.shape[1] * dest_size
+        pts[:, 1] = pts[:, 1] / img.shape[0] * dest_size
+        img = cv2.resize(img, (dest_size, dest_size))
+        # update mapping
+        lmks_mapping[save_path] = pts
+        cv2.imwrite(save_path, img)
+        # debug
+        if debug:
+            for p in pts:
+                c = (int(p[0]), int(p[1]))
+                cv2.circle(img, c, 2, (0, 255, 0), -1)
+            cv2.imshow('img', img)
+            cv2.waitKey(1)
+    # remove full
+    rmtree(f"{out_dir}/full")
+    # save landmarks
+    with open(os.path.join(out_dir, "landmark.pkl"), "wb") as fp:
+        pickle.dump(lmks_mapping, fp)
 
 
 def visualize_reconstruction(dataset_dir, speaker):
@@ -268,12 +303,13 @@ def build_nfr_dataset(dataset_dir, speaker):
 
 if __name__ == "__main__":
     import argparse
-    choices = ['prepare_vocaset', 'visualize_reconstruction', 'generate_masks', 'build_nfr_dataset']
+    choices = ['prepare_vocaset', 'prepare_celebtalk', 'visualize_reconstruction', 'generate_masks', 'build_nfr_dataset']
 
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", type=str, choices=choices)
     parser.add_argument("--dataset_dir", type=str, default=f"{ROOT}/data/vocaset_video")
-    parser.add_argument("--source_dir", type=str, default="~/assets/vocaset/Data/videos_lmks_crop")
+    parser.add_argument("--vocaset_dir", type=str, default="~/assets/vocaset/Data/videos_lmks_crop")
+    parser.add_argument("--celebtalk_dir", type=str, default="~/assets/CelebTalk")
     parser.add_argument("--dest_size", type=int, default=256)
     parser.add_argument('--matlab_data_path', type=str, default='renderer/data/data.mat')
     parser.add_argument("--speakers", type=str, nargs="+", default=["FaceTalk_170725_00137_TA"])
@@ -282,8 +318,12 @@ if __name__ == "__main__":
 
     if args.mode == "prepare_vocaset":
         for spk in args.speakers:
-            prepare_vocaset(args.dataset_dir, args.source_dir, spk, dest_size=args.dest_size, debug=args.debug, training=True)
-            prepare_vocaset(args.dataset_dir, args.source_dir, spk, dest_size=args.dest_size, debug=args.debug, training=False)
+            prepare_vocaset(args.dataset_dir, args.vocaset_dir, spk, dest_size=args.dest_size, debug=args.debug, training=True)
+            prepare_vocaset(args.dataset_dir, args.vocaset_dir, spk, dest_size=args.dest_size, debug=args.debug, training=False)
+    elif args.mode == "prepare_celebtalk":
+        for spk in args.speakers:
+            prepare_celebtalk(args.dataset_dir, args.celebtalk_dir, spk, dest_size=args.dest_size, debug=args.debug, training=True)
+            prepare_celebtalk(args.dataset_dir, args.celebtalk_dir, spk, dest_size=args.dest_size, debug=args.debug, training=False)
     elif args.mode == "visualize_reconstruction":
         for spk in args.speakers:
             visualize_reconstruction(args.dataset_dir, spk)

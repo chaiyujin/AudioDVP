@@ -120,4 +120,3 @@ def find_clip_dirs(data_dir, with_train, with_test):
                 clip_dirs.append(os.path.join(dirpath, subdir))
     clip_dirs = sorted(clip_dirs)
     return clip_dirs
-

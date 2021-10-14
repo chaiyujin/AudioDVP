@@ -11,3 +11,7 @@ source yk_functions.sh
 
 # RUN_VOCASET --epoch_d3d=1 --epoch_a2e=10 --epoch_nfr=25 --speaker=FaceTalk_170904_03276_TA --debug
 # RUN_VOCASET --epoch_d3d=20 --epoch_a2e=40 --epoch_nfr='' --speaker=FaceTalk_170908_03277_TA --debug
+
+
+RUN_CELEBTALK --epoch_d3d=20 --epoch_a2e=40 --epoch_nfr=200 --speaker=m000_obama  # --debug
+RUN_VOCASET   --epoch_d3d=20 --epoch_a2e=40 --epoch_nfr=200 --speaker=FaceTalk_170908_03277_TA  # --debug

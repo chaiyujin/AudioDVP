@@ -394,12 +394,83 @@ function RUN_VOCASET() {
 
   # * Test
   DRAW_DIVIDER;
-  for i in `seq 20 39`; do
-    local clip_id=$(printf clip"%02d" $i)
+  for i in `seq 21 40`; do
+    local clip_id=$(printf sentence"%02d" $i)
 
     TestClip \
       --clip_dir="$DATA_DIR/$SPEAKER/test/$clip_id" \
       --reenact_tar="$DATA_DIR/$SPEAKER/test/$clip_id" \
+      --result_dir="$DATA_DIR/$SPEAKER/results" \
+      --result_vpath="$DATA_DIR/$SPEAKER/results/test-$clip_id" \
+      --net_dir="$NET_DIR" \
+      --epoch_nfr="$EPOCH_NFR" \
+    ;
+  done
+}
+
+
+
+function RUN_CELEBTALK() {
+  local DATA_DIR=data/celebtalk
+  local SPEAKER="m000_obama"
+  local EPOCH_D3D=20
+  local EPOCH_A2E=40
+  local EPOCH_NFR=
+  local DEBUG=
+  # Override from arguments
+  for var in "$@"; do
+    case $var in
+      --data_dir=*  ) DATA_DIR=${var#*=}  ;;
+      --speaker=*   ) SPEAKER=${var#*=}   ;;
+      --epoch_d3d=* ) EPOCH_D3D=${var#*=} ;;
+      --epoch_a2e=* ) EPOCH_A2E=${var#*=} ;;
+      --epoch_nfr=* ) EPOCH_NFR=${var#*=} ;;
+      --debug       ) DEBUG="--debug"     ;;
+    esac
+  done
+  # Check variables
+  # - Check EPOCH_NFR is none or times of 25
+  if [ -n "${EPOCH_NFR}" ] && [ "$(( ${EPOCH_NFR} % 25 ))" -ne 0 ]; then
+    printf "${ERROR} EPOCH_NFR=${EPOCH_NFR}, which is not times of 25!\n"
+    exit 1
+  fi
+
+  # The checkpoints directory for this speaker
+  local NET_DIR="$DATA_DIR/$SPEAKER/checkpoints"
+
+  # Print arguments
+  DRAW_DIVIDER;
+  printf "Speaker        : $SPEAKER\n"
+  printf "Data directory : $DATA_DIR\n"
+  printf "Checkpoints    : $NET_DIR\n"
+  printf "Epoch for D3D  : $EPOCH_D3D\n"
+  printf "Epoch for A2E  : $EPOCH_A2E\n"
+  printf "Epoch for NFR  : $EPOCH_NFR\n"
+
+  # Shared arguments
+  local SHARED="--data_dir=$DATA_DIR --net_dir=$NET_DIR --speaker=$SPEAKER ${DEBUG}"
+
+  DRAW_DIVIDER;
+  PrepareData $SHARED --data_source=celebtalk --epoch=$EPOCH_D3D
+
+  DRAW_DIVIDER;
+  TrainAudio2Expression ${SHARED} --epoch=$EPOCH_A2E
+
+  # (Optional) train neural renderer
+  if [ -n "${EPOCH_NFR}" ]; then
+    DRAW_DIVIDER;
+    TrainNeuralFaceRenderer ${SHARED} --epoch=$EPOCH_NFR
+  fi
+
+  # * Test
+  DRAW_DIVIDER;
+  for d in "$DATA_DIR/$SPEAKER/test"/*; do
+    if [ ! -d "$d" ]; then continue; fi
+    local clip_id="$(basename ${d})"
+
+    TestClip \
+      --clip_dir="$d" \
+      --reenact_tar="$d" \
       --result_dir="$DATA_DIR/$SPEAKER/results" \
       --result_vpath="$DATA_DIR/$SPEAKER/results/test-$clip_id" \
       --net_dir="$NET_DIR" \

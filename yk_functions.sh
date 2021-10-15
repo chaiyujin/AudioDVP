@@ -110,7 +110,7 @@ function PrepareData() {
     --dataset_mode multi \
     --num_epoch ${EPOCH} \
     --lambda_photo 2.0 \
-    --lambda_land 0.1 \
+    --lambda_land 6e-3 \
     --serial_batches False \
     --display_freq 400 \
     --print_freq 400 \
@@ -289,12 +289,14 @@ function TestClip() {
   python3 reenact.py --src_dir "$clip_dir" --tgt_dir "$reenact_tar";
 
   # create video result
-  mkdir -p "$result_dir"
-  ffmpeg -n -loglevel error \
-    -thread_queue_size 8192 -i $clip_dir/audio/audio.wav \
-    -thread_queue_size 8192 -i $clip_dir/reenact/%05d.png \
-    -vcodec libx264 -preset slower -profile:v high -crf 18 -pix_fmt yuv420p -shortest "${result_vpath}-render.mp4" \
-  ;
+  if [ ! -f "${result_vpath}-render.mp4" ]; then
+    mkdir -p "$result_dir"
+    ffmpeg -y -loglevel error \
+      -thread_queue_size 8192 -i $clip_dir/audio/audio.wav \
+      -thread_queue_size 8192 -i $clip_dir/reenact/%05d.png \
+      -vcodec libx264 -preset slower -profile:v high -crf 18 -pix_fmt yuv420p -shortest "${result_vpath}-render.mp4" \
+    ;
+  fi
 
   # * If NFR is not trained, we directly return
   if [ -z "${epoch_nfr}" ]; then
@@ -320,15 +322,18 @@ function TestClip() {
   ;
 
   # composite lower face back to original video
-  python3 comp.py --src_dir $audio_dir --tgt_dir $audio_dir
+  python3 comp.py --src_dir "$clip_dir" --tgt_dir "$reenact_tar";
 
   # create video result
-  mkdir -p "$result_dir"
-  ffmpeg -y -loglevel error \
-    -thread_queue_size 8192 -i $audio_dir/audio/audio.wav \
-    -thread_queue_size 8192 -i $audio_dir/comp/%05d.png \
-    -vcodec libx264 -preset slower -profile:v high -crf 18 -pix_fmt yuv420p -shortest "${result_vpath}-nfr.mp4" \
-  ;
+  if [ ! -f "${result_vpath}-nfr.mp4" ]; then
+    mkdir -p "$result_dir"
+    ffmpeg -y -loglevel error \
+      -thread_queue_size 8192 -i $clip_dir/audio/audio.wav \
+      -thread_queue_size 8192 -i $clip_dir/comp/%05d.png \
+      -vcodec libx264 -preset slower -profile:v high -crf 18 -pix_fmt yuv420p -shortest "${result_vpath}-nfr.mp4" \
+    ;
+  fi
+
 }
 
 # * ---------------------------------------------------------------------------------------------------------------- * #
@@ -395,7 +400,7 @@ function RUN_VOCASET() {
   # * Test
   DRAW_DIVIDER;
   for i in `seq 21 40`; do
-    local clip_id=$(printf sentence"%02d" $i)
+    local clip_id=$(printf clip-sentence"%02d" $i)
 
     TestClip \
       --clip_dir="$DATA_DIR/$SPEAKER/test/$clip_id" \

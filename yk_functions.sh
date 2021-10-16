@@ -218,21 +218,21 @@ function TrainNeuralFaceRenderer() {
     fi
     cd ${CWD}
 
-    # remove other checkpoints of nfr
-    REGEX_CKPT=".*_net_.*"
-    REGEX_SAVE=".*${EPOCH}_net_.*"
-    for entry in "$NET_DIR/nfr"/*
-    do
-      if [[ $entry =~ $REGEX_CKPT ]]; then
-        # don't delete the one we need
-        if [[ $entry =~ $REGEX_SAVE ]]; then
-          continue
-        fi
-        # delete other checkpoints
-        echo delete "$entry"
-        rm "$entry"
-      fi
-    done
+    # # remove other checkpoints of nfr
+    # REGEX_CKPT=".*_net_.*"
+    # REGEX_SAVE=".*${EPOCH}_net_.*"
+    # for entry in "$NET_DIR/nfr"/*
+    # do
+    #   if [[ $entry =~ $REGEX_CKPT ]]; then
+    #     # don't delete the one we need
+    #     if [[ $entry =~ $REGEX_SAVE ]]; then
+    #       continue
+    #     fi
+    #     # delete other checkpoints
+    #     echo delete "$entry"
+    #     rm "$entry"
+    #   fi
+    # done
   fi
   
   if [ ! -f "${NET_DIR}/nfr/${EPOCH}_net_G.pth" ]; then

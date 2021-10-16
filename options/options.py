@@ -44,6 +44,8 @@ class Options:
         self.parser.add_argument('--gt_pose', type=self.str2bool, default=False)
         self.parser.add_argument('--offset', type=int, default=0)
 
+        self.parser.add_argument('--lower', action="store_true", help="only use lower face")
+
     def parse_args(self):
         self.args = self.parser.parse_args()
         self.args.device = torch.device('cuda:{}'.format(self.args.gpu_ids[0])) if self.args.gpu_ids else torch.device('cpu')

@@ -35,7 +35,7 @@ if __name__ == '__main__':
         trnsl = trnsl_list[i + opt.offset].unsqueeze(0).cuda()
 
         # render
-        render, _, _ = face_model(alpha, delta, beta, rotat, trnsl, gamma, lower=True)
+        render, _, _ = face_model(alpha, delta, beta, rotat, trnsl, gamma, lower=opt.lower)
         utils.save_image(render, os.path.join(opt.src_dir, 'reenact', '%05d.png' % (i+1)))
 
         if i >= opt.test_num:

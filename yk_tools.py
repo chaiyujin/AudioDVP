@@ -206,7 +206,7 @@ def visualize_reconstruction(dataset_dir, speaker):
         assert os.system(cmd) == 0
 
 
-def generate_masks(mouth_mask, dataset_dir, speaker):
+def generate_masks(mouth_mask, dataset_dir, speaker, debug):
     data_dir = os.path.join(dataset_dir, speaker)
 
     # find training clips
@@ -240,6 +240,9 @@ def generate_masks(mouth_mask, dataset_dir, speaker):
 
             save_path = os.path.join(clip_dir, 'mask', '%05d.png' % (i+1))
             cv2.imwrite(save_path, mask)
+            if debug:
+                cv2.imshow('mask', mask)
+                cv2.waitKey(1)
         
         with open(done_flag, "w") as fp:
             fp.write("")
@@ -319,6 +322,7 @@ if __name__ == "__main__":
     parser.add_argument("--celebtalk_dir", type=str, default="~/assets/CelebTalk")
     parser.add_argument("--dest_size", type=int, default=256)
     parser.add_argument('--matlab_data_path', type=str, default='renderer/data/data.mat')
+    parser.add_argument("--lower", action="store_true", help="only use lower face")
     parser.add_argument("--speakers", type=str, nargs="+", default=["FaceTalk_170725_00137_TA"])
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
@@ -337,7 +341,7 @@ if __name__ == "__main__":
     elif args.mode == "generate_masks":
         mouth_mask = networks.MouthMask(args)
         for spk in args.speakers:
-            generate_masks(mouth_mask, args.dataset_dir, spk)
+            generate_masks(mouth_mask, args.dataset_dir, spk, debug=args.debug)
     elif args.mode == "build_nfr_dataset":
         for spk in args.speakers:
             build_nfr_dataset(args.dataset_dir, spk)

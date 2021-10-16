@@ -234,6 +234,7 @@ class AudioExpressionModule(nn.Module):
 class MouthMask(nn.Module):
     def __init__(self, opt):
         super(MouthMask, self).__init__()
+        self.lower = opt.lower
         self.face_model = FaceModel(data_path=opt.matlab_data_path, batch_size=1)
         self.tensor2pil = transforms.ToPILImage()
 
@@ -241,10 +242,10 @@ class MouthMask(nn.Module):
         delta = delta.clone()
 
         delta[0, 0, 0] = -8.0
-        _, open_mask, _ = self.face_model(alpha, delta, beta, rotation, translation, gamma, lower=True)
+        _, open_mask, _ = self.face_model(alpha, delta, beta, rotation, translation, gamma, lower=self.lower)
 
         delta[:, :, :] = 0.0
-        _, close_mask, _ = self.face_model(alpha, delta, beta, rotation, translation, gamma, lower=True)
+        _, close_mask, _ = self.face_model(alpha, delta, beta, rotation, translation, gamma, lower=self.lower)
 
         mouth_mask = torch.clamp(open_mask + close_mask, min=0.0, max=1.0)
 

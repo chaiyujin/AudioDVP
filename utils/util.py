@@ -116,7 +116,10 @@ def find_clip_dirs(data_dir, with_train, with_test):
             continue
         # collect
         for subdir in subdirs:
-            if subdir.startswith("clip") and os.path.exists(os.path.join(dirpath, subdir, "crop")):
+            if subdir.startswith("clip") and (
+                os.path.exists(os.path.join(dirpath, subdir, "crop")) or
+                os.path.exists(os.path.join(dirpath, subdir, "delta"))
+            ):
                 clip_dirs.append(os.path.join(dirpath, subdir))
     clip_dirs = sorted(clip_dirs)
     return clip_dirs

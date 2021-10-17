@@ -39,6 +39,8 @@ class ResnetModel:
                 lr=opt.lr,
                 betas=(0.5, 0.999)
             )
+        
+        assert self.opt.recons_dir is not None
 
     def set_input(self, input):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -108,9 +110,11 @@ class ResnetModel:
         """Save 3DMM coef and image"""
 
         for i in range(self.opt.batch_size):
-            clip_dir = os.path.dirname(os.path.dirname(self.image_name[i]))
-            save_dir = os.path.join(clip_dir, "reconstructed")
             img_name = os.path.splitext(os.path.basename(self.image_name[i]))[0]
+            clip_dir = os.path.dirname(os.path.dirname(self.image_name[i]))
+            ss = clip_dir.split('/')  # data, train/test, clip-
+            save_dir = os.path.join(self.opt.recons_dir, ss[-2], ss[-1])
+
             if not os.path.exists(os.path.join(save_dir, 'translation')):
                 create_dir(os.path.join(save_dir, 'render'))
                 create_dir(os.path.join(save_dir, 'overlay'))

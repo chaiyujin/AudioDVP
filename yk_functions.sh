@@ -76,34 +76,46 @@ function RUN_WITH_LOCK_GUARD() {
 
 function PrepareData() {
   local DATA_SRC=
-  local DATA_DIR=
-  local NET_DIR=
   local SPEAKER=
+  local EXP_DIR=
   local EPOCH=
   local DEBUG=
   # Override from arguments
   for var in "$@"; do
     case $var in
-      --data_source=*) DATA_SRC=${var#*=}  ;;
-      --data_dir=*   ) DATA_DIR=${var#*=}  ;;
-      --net_dir=*    ) NET_DIR=${var#*=}   ;;
-      --speaker=*    ) SPEAKER=${var#*=}   ;;
-      --epoch=*      ) EPOCH=${var#*=}     ;;
-      --debug        ) DEBUG="--debug"     ;;
+      --data_src=* ) DATA_SRC=${var#*=}  ;;
+      --speaker=*  ) SPEAKER=${var#*=}   ;;
+      --exp_dir=*  ) EXP_DIR=${var#*=}   ;;
+      --epoch=*    ) EPOCH=${var#*=}     ;;
+      --debug      ) DEBUG="--debug"     ;;
     esac
   done
 
-  [ -n "$DATA_SRC" ] || { echo "data_source is not set!"; exit 1; }
-  [ -n "$DATA_DIR" ] || { echo "data_dir is not set!";    exit 1; }
-  [ -n "$NET_DIR"  ] || { echo "net_dir is not set!";     exit 1; }
-  [ -n "$SPEAKER"  ] || { echo "speaker is not set!";     exit 1; }
-  [ -n "$EPOCH"    ] || { echo "epoch is not set!";       exit 1; }
+  [ -n "$DATA_SRC" ] || { echo "data_src is not set!"; exit 1; }
+  [ -n "$SPEAKER"  ] || { echo "speaker is not set!";  exit 1; }
+  [ -n "$EXP_DIR"  ] || { echo "exp_dir is not set!";  exit 1; }
+  [ -n "$EPOCH"    ] || { echo "epoch is not set!";    exit 1; }
+
+  local NET_DIR="$EXP_DIR/checkpoints"
+  local DATA_DIR="$EXP_DIR/data"
+  local RECONS_DIR="$EXP_DIR/reconstructed"
+  local JOB_LOCK="$RECONS_DIR/all_done.lock"
+
+  # * Guard lock file
+  if [ -f "$JOB_LOCK" ]; then
+    printf "[SKIP]: Reconstruction is already done before!\n"
+    return
+  fi
 
   # prepare data
-  if ! python3 yk_tools.py "prepare_$DATA_SRC" --dataset_dir $DATA_DIR --speakers $SPEAKER ${DEBUG} ; then
-    printf "${ERROR} Failed to prepare data for source: ${DATA_SRC}!\n"
-    exit 1
-  fi
+  python3 yk_tools.py "prepare_$DATA_SRC" \
+    --data_dir $DATA_DIR  \
+    --speaker  $SPEAKER   \
+    ${DEBUG} \
+  || {
+    printf "${ERROR} Failed to prepare data for source: ${DATA_SRC}!\n";
+    exit 1;
+  }
 
   RUN_WITH_LOCK_GUARD --tag="Reconstruct" --lock_file="${NET_DIR}/recons3d_net.pth" -- \
   python3 train.py \
@@ -115,26 +127,37 @@ function PrepareData() {
     --display_freq 400 \
     --print_freq 400 \
     --batch_size 5 \
-    --data_dir "$DATA_DIR/$SPEAKER" \
     --net_dir $NET_DIR \
+    --data_dir $DATA_DIR \
+    --recons_dir $RECONS_DIR \
   ;
 
   # generate masks
-  if ! python3 yk_tools.py generate_masks --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER ${DEBUG} ; then
-    printf "${ERROR} Failed to generate masks!\n"
-    exit 1
-  fi
+  python3 yk_tools.py generate_masks \
+    --recons_dir $RECONS_DIR \
+    ${DEBUG} \
+  || {
+    printf "${ERROR} Failed to generate masks!\n";
+    exit 1;
+  }
 
   # visualize by generating debug videos
-  if ! python3 yk_tools.py visualize_reconstruction --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER ${DEBUG} ; then
-    printf "${ERROR} Failed to visualize reconstruction!\n"
-    exit 1
-  fi
+  python3 yk_tools.py visualize_reconstruction \
+    --data_dir $DATA_DIR \
+    --recons_dir $RECONS_DIR \
+    ${DEBUG} \
+  || {
+    printf "${ERROR} Failed to visualize reconstruction!\n";
+    exit 1;
+  }
+
+  # * Create lock file
+  [ ! -f "$JOB_LOCK" ] || touch "$JOB_LOCK"
 }
 
 # * -------------------------------------------- Train Audio2Expression -------------------------------------------- * #
 
-function TrainAudio2Expression() {
+function TrainA2E() {
   local DATA_DIR=
   local NET_DIR=
   local SPEAKER=
@@ -172,7 +195,7 @@ function TrainAudio2Expression() {
 
 # * ------------------------------------------ Train neural face renderer ------------------------------------------ * #
 
-function TrainNeuralFaceRenderer() {
+function TrainNFR() {
   local DATA_DIR=
   local NET_DIR=
   local SPEAKER=
@@ -195,7 +218,7 @@ function TrainNeuralFaceRenderer() {
   [ -n "$EPOCH"    ] || { echo "epoch is not set!";    exit 1; }
 
   # data generation
-  if ! python3 yk_tools.py build_nfr_dataset --dataset_dir $CWD/$DATA_DIR --speakers $SPEAKER ${DEBUG}; then
+  if ! python3 yk_tools.py build_nfr_dataset --dataset_dir $CWD/$DATA_DIR --speaker $SPEAKER ${DEBUG}; then
     printf "${ERROR} Failed to build nfr dataset!\n"
     exit 1
   fi
@@ -220,7 +243,7 @@ function TrainNeuralFaceRenderer() {
 
     # # remove other checkpoints of nfr
     # REGEX_CKPT=".*_net_.*"
-    # REGEX_SAVE=".*${EPOCH}_net_.*"
+    # REGEX_SAVE=".*${EPOCH}_net_.*/$SPEAKER"
     # for entry in "$NET_DIR/nfr"/*
     # do
     #   if [[ $entry =~ $REGEX_CKPT ]]; then
@@ -340,16 +363,17 @@ function TestClip() {
 # *                                                Collection of steps                                               * #
 # * ---------------------------------------------------------------------------------------------------------------- * #
 
-function RUN_VOCASET() {
-  local DATA_DIR=data/vocaset
-  local SPEAKER="FaceTalk_170725_00137_TA"
-  local EPOCH_D3D=20
-  local EPOCH_A2E=40
+function RUN_YK_EXP() {
+  local DATA_SRC=
+  local SPEAKER=
+  local EPOCH_D3D=60
+  local EPOCH_A2E=60
   local EPOCH_NFR=
   local DEBUG=
   # Override from arguments
   for var in "$@"; do
     case $var in
+      --data_src=*  ) DATA_SRC=${var#*=}  ;;
       --data_dir=*  ) DATA_DIR=${var#*=}  ;;
       --speaker=*   ) SPEAKER=${var#*=}   ;;
       --epoch_d3d=* ) EPOCH_D3D=${var#*=} ;;
@@ -358,113 +382,42 @@ function RUN_VOCASET() {
       --debug       ) DEBUG="--debug"     ;;
     esac
   done
+
   # Check variables
-  # - Check speaker is FaceTalk
-  if [[ ! ${SPEAKER} =~ FaceTalk_.* ]]; then
-    printf "${ERROR} SPEAKER=${SPEAKER}, is not one from VOCASET!\n"
-    exit 1
-  fi
-  # - Check EPOCH_NFR is none or times of 25
+  [ -z "$DATA_SRC" ] || { echo "data_src is not set!"; exit 1; }
+  [ -z "$SPEAKER"  ] || { echo "speaker is not set!";  exit 1; }
+  # Check EPOCH_NFR is none or times of 25
   if [ -n "${EPOCH_NFR}" ] && [ "$(( ${EPOCH_NFR} % 25 ))" -ne 0 ]; then
     printf "${ERROR} EPOCH_NFR=${EPOCH_NFR}, which is not times of 25!\n"
     exit 1
   fi
+  DATA_SRC=${DATA_SRC,,}
 
-  # The checkpoints directory for this speaker
-  local NET_DIR="$DATA_DIR/$SPEAKER/checkpoints"
+  # Some preset dirs
+  local EXP_DIR="yk_exp/$DATA_SRC/$SPEAKER"
+  # Shared arguments
+  local SHARED="--data_src=$DATA_SRC --exp_dir=$EXP_DIR --speaker=$SPEAKER ${DEBUG}"
 
   # Print arguments
   DRAW_DIVIDER;
+  printf "Data source    : $DATA_SRC\n"
   printf "Speaker        : $SPEAKER\n"
   printf "Data directory : $DATA_DIR\n"
   printf "Checkpoints    : $NET_DIR\n"
+  printf "Results        : $NET_DIR\n"
   printf "Epoch for D3D  : $EPOCH_D3D\n"
   printf "Epoch for A2E  : $EPOCH_A2E\n"
   printf "Epoch for NFR  : $EPOCH_NFR\n"
 
-  # Shared arguments
-  local SHARED="--data_dir=$DATA_DIR --net_dir=$NET_DIR --speaker=$SPEAKER ${DEBUG}"
+  # * Step 1: Prepare data
+  DRAW_DIVIDER; PrepareData $SHARED --epoch=$EPOCH_D3D
 
-  DRAW_DIVIDER;
-  PrepareData $SHARED --data_source=vocaset --epoch=$EPOCH_D3D
+  # * Step 2: Train audio to expression
+  DRAW_DIVIDER; TrainA2E ${SHARED} --epoch=$EPOCH_A2E
 
-  DRAW_DIVIDER;
-  TrainAudio2Expression ${SHARED} --epoch=$EPOCH_A2E
-
-  # (Optional) train neural renderer
+  # * Step 3: (Optional) train neural renderer
   if [ -n "${EPOCH_NFR}" ]; then
-    DRAW_DIVIDER;
-    TrainNeuralFaceRenderer ${SHARED} --epoch=$EPOCH_NFR
-  fi
-
-  # * Test
-  DRAW_DIVIDER;
-  for i in `seq 21 40`; do
-    local clip_id=$(printf clip-sentence"%02d" $i)
-
-    TestClip \
-      --clip_dir="$DATA_DIR/$SPEAKER/test/$clip_id" \
-      --reenact_tar="$DATA_DIR/$SPEAKER/test/$clip_id" \
-      --result_dir="$DATA_DIR/$SPEAKER/results" \
-      --result_vpath="$DATA_DIR/$SPEAKER/results/test-$clip_id" \
-      --net_dir="$NET_DIR" \
-      --epoch_nfr="$EPOCH_NFR" \
-    ;
-  done
-}
-
-
-
-function RUN_CELEBTALK() {
-  local DATA_DIR=data/celebtalk
-  local SPEAKER="m000_obama"
-  local EPOCH_D3D=20
-  local EPOCH_A2E=40
-  local EPOCH_NFR=
-  local DEBUG=
-  # Override from arguments
-  for var in "$@"; do
-    case $var in
-      --data_dir=*  ) DATA_DIR=${var#*=}  ;;
-      --speaker=*   ) SPEAKER=${var#*=}   ;;
-      --epoch_d3d=* ) EPOCH_D3D=${var#*=} ;;
-      --epoch_a2e=* ) EPOCH_A2E=${var#*=} ;;
-      --epoch_nfr=* ) EPOCH_NFR=${var#*=} ;;
-      --debug       ) DEBUG="--debug"     ;;
-    esac
-  done
-  # Check variables
-  # - Check EPOCH_NFR is none or times of 25
-  if [ -n "${EPOCH_NFR}" ] && [ "$(( ${EPOCH_NFR} % 25 ))" -ne 0 ]; then
-    printf "${ERROR} EPOCH_NFR=${EPOCH_NFR}, which is not times of 25!\n"
-    exit 1
-  fi
-
-  # The checkpoints directory for this speaker
-  local NET_DIR="$DATA_DIR/$SPEAKER/checkpoints"
-
-  # Print arguments
-  DRAW_DIVIDER;
-  printf "Speaker        : $SPEAKER\n"
-  printf "Data directory : $DATA_DIR\n"
-  printf "Checkpoints    : $NET_DIR\n"
-  printf "Epoch for D3D  : $EPOCH_D3D\n"
-  printf "Epoch for A2E  : $EPOCH_A2E\n"
-  printf "Epoch for NFR  : $EPOCH_NFR\n"
-
-  # Shared arguments
-  local SHARED="--data_dir=$DATA_DIR --net_dir=$NET_DIR --speaker=$SPEAKER ${DEBUG}"
-
-  DRAW_DIVIDER;
-  PrepareData $SHARED --data_source=celebtalk --epoch=$EPOCH_D3D
-
-  DRAW_DIVIDER;
-  TrainAudio2Expression ${SHARED} --epoch=$EPOCH_A2E
-
-  # (Optional) train neural renderer
-  if [ -n "${EPOCH_NFR}" ]; then
-    DRAW_DIVIDER;
-    TrainNeuralFaceRenderer ${SHARED} --epoch=$EPOCH_NFR
+    DRAW_DIVIDER; TrainNFR ${SHARED} --epoch=$EPOCH_NFR
   fi
 
   # * Test

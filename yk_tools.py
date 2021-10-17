@@ -50,7 +50,6 @@ def prepare_vocaset(output_root, data_root, speaker, training, dest_size=256, de
     output_root = os.path.join(output_root, speaker, "train" if training else "test")
 
     data_root = os.path.expanduser(data_root)
-    data_root = os.path.join(data_root, speaker)
 
     seq_range = list(range(0, 20)) if training else list(range(20, 40))
     for i_seq in tqdm(seq_range, desc=f"[prepare_vocaset]: {speaker}/{seq_range[0]}-{seq_range[-1]}"):
@@ -69,7 +68,6 @@ def prepare_celebtalk(output_root, data_root, speaker, training, dest_size=256, 
     output_root = os.path.join(output_root, speaker, "train" if training else "test")
 
     data_root = os.path.expanduser(data_root)
-    data_root = os.path.join(data_root, "ProcessTasks", speaker, "clips_cropped")
 
     tasks = []
     for cur_root, _, files in os.walk(data_root):
@@ -182,35 +180,30 @@ def _preprocess_video(out_dir, vpath, lpath, dest_size, debug):
         pickle.dump(lmks_mapping, fp)
 
 
-def visualize_reconstruction(dataset_dir, speaker):
+def visualize_reconstruction(data_dir, recons_dir):
     # find clips
-    clip_dirs = []
-    for dirpath, subdirs, _ in os.walk(os.path.join(dataset_dir, speaker)):
-        for subdir in subdirs:
-            if subdir.startswith("clip") and os.path.exists(os.path.join(dirpath, subdir, "crop")):
-                clip_dirs.append(os.path.join(dirpath, subdir))
-    clip_dirs = sorted(clip_dirs)
+    clip_dirs = util.find_clip_dirs(data_dir, with_train=True, with_test=True)
 
     for clip_dir in tqdm(clip_dirs, desc="[visualize_reconstruction]"):
-        if os.path.exists(clip_dir + "-debug.mp4"):
+        ss = clip_dir.split('/')
+        clip_recons_dir = os.path.join(recons_dir, ss[-2], ss[-1])
+        if os.path.exists(clip_recons_dir + "-debug.mp4"):
             continue
         cmd = (
             "ffmpeg -hide_banner -n -loglevel error "
-            "-thread_queue_size 8192 -i {0}/reconstructed/render/%05d.png "
-            "-thread_queue_size 8192 -i {0}/reconstructed/overlay/%05d.png "
+            "-thread_queue_size 8192 -i {1}/render/%05d.png "
+            "-thread_queue_size 8192 -i {1}/overlay/%05d.png "
             "-thread_queue_size 8192 -i {0}/crop/%05d.png "
             "-i {0}/audio/audio.wav "
             "-filter_complex hstack=inputs=3 -vcodec libx264 -preset slower "
-            "-profile:v high -crf 18 -pix_fmt yuv420p {0}-debug.mp4"
-        ).format(clip_dir)
+            "-profile:v high -crf 18 -pix_fmt yuv420p {1}-debug.mp4"
+        ).format(clip_dir, clip_recons_dir)
         assert os.system(cmd) == 0
 
 
-def generate_masks(mouth_mask, dataset_dir, speaker, debug):
-    data_dir = os.path.join(dataset_dir, speaker)
-
+def generate_masks(mouth_mask, recons_dir, debug):
     # find training clips
-    clip_dirs = util.find_clip_dirs(data_dir, with_train=True, with_test=True)
+    clip_dirs = util.find_clip_dirs(recons_dir, with_train=True, with_test=True)
 
     # generate mask for all clips
     for clip_dir in tqdm(clip_dirs, desc="[generate_masks]: Generate masks"):
@@ -219,12 +212,12 @@ def generate_masks(mouth_mask, dataset_dir, speaker, debug):
             continue
 
         util.create_dir(os.path.join(clip_dir, 'mask'))
-        alpha_list = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'alpha'      ), verbose=False)
-        beta_list  = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'beta'       ), verbose=False)
-        delta_list = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'delta'      ), verbose=False)
-        gamma_list = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'gamma'      ), verbose=False)
-        angle_list = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'rotation'   ), verbose=False)
-        trnsl_list = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'translation'), verbose=False)
+        alpha_list = util.load_coef(os.path.join(clip_dir, 'alpha'      ), verbose=False)
+        beta_list  = util.load_coef(os.path.join(clip_dir, 'beta'       ), verbose=False)
+        delta_list = util.load_coef(os.path.join(clip_dir, 'delta'      ), verbose=False)
+        gamma_list = util.load_coef(os.path.join(clip_dir, 'gamma'      ), verbose=False)
+        angle_list = util.load_coef(os.path.join(clip_dir, 'rotation'   ), verbose=False)
+        trnsl_list = util.load_coef(os.path.join(clip_dir, 'translation'), verbose=False)
 
         for i in tqdm(range(len(alpha_list)), leave=False):
             alpha = alpha_list[i].unsqueeze(0).cuda()
@@ -317,31 +310,29 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", type=str, choices=choices)
-    parser.add_argument("--dataset_dir", type=str, default=f"{ROOT}/data/vocaset_video")
-    parser.add_argument("--vocaset_dir", type=str, default="~/assets/vocaset/Data/videos_lmks_crop")
+    parser.add_argument("--vocaset_dir", type=str, default="~/assets/vocaset")
     parser.add_argument("--celebtalk_dir", type=str, default="~/assets/CelebTalk")
+    parser.add_argument("--data_dir", type=str, default=None)
+    parser.add_argument("--recons_dir", type=str, default=None)
     parser.add_argument("--dest_size", type=int, default=256)
     parser.add_argument('--matlab_data_path', type=str, default='renderer/data/data.mat')
     parser.add_argument("--lower", action="store_true", help="only use lower face")
-    parser.add_argument("--speakers", type=str, nargs="+", default=["FaceTalk_170725_00137_TA"])
+    parser.add_argument("--speaker", type=str, nargs="+", default=["FaceTalk_170725_00137_TA"])
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
     if args.mode == "prepare_vocaset":
-        for spk in args.speakers:
-            prepare_vocaset(args.dataset_dir, args.vocaset_dir, spk, dest_size=args.dest_size, debug=args.debug, training=True)
-            prepare_vocaset(args.dataset_dir, args.vocaset_dir, spk, dest_size=args.dest_size, debug=args.debug, training=False)
+        spk_dir = os.path.join(args.vocaset_dir, "Data", "videos_lmks_crop", args.speaker)
+        prepare_vocaset(args.data_dir, spk_dir, dest_size=args.dest_size, debug=args.debug, training=True)
+        prepare_vocaset(args.data_dir, spk_dir, dest_size=args.dest_size, debug=args.debug, training=False)
     elif args.mode == "prepare_celebtalk":
-        for spk in args.speakers:
-            prepare_celebtalk(args.dataset_dir, args.celebtalk_dir, spk, dest_size=args.dest_size, debug=args.debug, training=True)
-            prepare_celebtalk(args.dataset_dir, args.celebtalk_dir, spk, dest_size=args.dest_size, debug=args.debug, training=False)
+        spk_dir = os.path.join(args.celebtalk_dir, "ProcessTasks", args.speaker, "clips_cropped")
+        prepare_celebtalk(args.data_dir, spk_dir, dest_size=args.dest_size, debug=args.debug, training=True)
+        prepare_celebtalk(args.data_dir, spk_dir, dest_size=args.dest_size, debug=args.debug, training=False)
     elif args.mode == "visualize_reconstruction":
-        for spk in args.speakers:
-            visualize_reconstruction(args.dataset_dir, spk)
+        visualize_reconstruction(args.data_dir, args.speakers)
     elif args.mode == "generate_masks":
         mouth_mask = networks.MouthMask(args)
-        for spk in args.speakers:
-            generate_masks(mouth_mask, args.dataset_dir, spk, debug=args.debug)
+        generate_masks(mouth_mask, args.recons_dir, debug=args.debug)
     elif args.mode == "build_nfr_dataset":
-        for spk in args.speakers:
-            build_nfr_dataset(args.dataset_dir, spk)
+        build_nfr_dataset(args.dataset_dir, spk)

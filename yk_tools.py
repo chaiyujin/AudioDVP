@@ -45,14 +45,14 @@ def calc_bbox(lmks_list):
     return x, y, w, h
 
 
-def prepare_vocaset(output_root, data_root, speaker, training, dest_size=256, debug=False):
+def prepare_vocaset(output_root, data_root, training, dest_size=256, debug=False):
     output_root = os.path.expanduser(output_root)
-    output_root = os.path.join(output_root, speaker, "train" if training else "test")
+    output_root = os.path.join(output_root, "train" if training else "test")
 
     data_root = os.path.expanduser(data_root)
 
     seq_range = list(range(0, 20)) if training else list(range(20, 40))
-    for i_seq in tqdm(seq_range, desc=f"[prepare_vocaset]: {speaker}/{seq_range[0]}-{seq_range[-1]}"):
+    for i_seq in tqdm(seq_range, desc=f"[prepare_vocaset]: {os.path.basename(data_root)}/{seq_range[0]}-{seq_range[-1]}"):
         # data source
         prefix = os.path.join(data_root, f"sentence{i_seq+1:02d}")
         vpath = prefix + ".mp4"
@@ -63,9 +63,9 @@ def prepare_vocaset(output_root, data_root, speaker, training, dest_size=256, de
         _preprocess_video(out_dir, vpath, lpath, dest_size, debug)
 
 
-def prepare_celebtalk(output_root, data_root, speaker, training, dest_size=256, debug=False):
+def prepare_celebtalk(output_root, data_root, training, dest_size=256, debug=False):
     output_root = os.path.expanduser(output_root)
-    output_root = os.path.join(output_root, speaker, "train" if training else "test")
+    output_root = os.path.join(output_root, "train" if training else "test")
 
     data_root = os.path.expanduser(data_root)
 
@@ -87,7 +87,7 @@ def prepare_celebtalk(output_root, data_root, speaker, training, dest_size=256, 
             #         tasks.append(os.path.join(cur_root, fpath))
         break
 
-    for vpath in tqdm(tasks, desc=f"[prepare_celebtalk]: {speaker}"):
+    for vpath in tqdm(tasks, desc=f"[prepare_celebtalk]: {os.path.basename(data_root)}"):
         # data source
         lpath = os.path.splitext(vpath)[0] + "-lmks-ibug-68.toml"
         # output dir
@@ -241,27 +241,29 @@ def generate_masks(mouth_mask, recons_dir, debug):
             fp.write("")
 
 
-def build_nfr_dataset(dataset_dir, speaker):
-    data_dir = os.path.join(dataset_dir, speaker)
-    done_flag = os.path.join(data_dir, "nfr", "done.flag")
+def build_nfr_dataset(data_dir, recons_dir, nfr_data_dir):
+    # done lock
+    done_flag = os.path.join(nfr_data_dir, "done.flag")
     if os.path.exists(done_flag):
         print("[build_nfr_dataset]: Find {}. It's already done! Skip.".format(done_flag))
         return
 
     # find training clips
-    clip_dirs = util.find_clip_dirs(data_dir, with_train=True, with_test=False)  # !IMPORTANT: Only training
-
-    # create dir for nfr dataset
-    util.create_dir(os.path.join(data_dir, 'nfr', 'A', 'train'))
-    util.create_dir(os.path.join(data_dir, 'nfr', 'B', 'train'))
+    # !IMPORTANT: Only training
+    clip_dirs = util.find_clip_dirs(data_dir, with_train=True, with_test=False)
 
     # collect all masks, crops and renders from clips
     masks, crops, renders = [], [], []
     for clip_dir in clip_dirs:
-        masks  .extend(util.get_file_list(os.path.join(clip_dir, 'mask')))
+        ss = clip_dir.split('/')
+        clip_recons_dir = os.path.join(recons_dir, ss[-2], ss[-1])
         crops  .extend(util.get_file_list(os.path.join(clip_dir, 'crop')))
-        renders.extend(util.get_file_list(os.path.join(clip_dir, 'reconstructed', 'render')))
+        masks  .extend(util.get_file_list(os.path.join(clip_recons_dir, 'mask')))
+        renders.extend(util.get_file_list(os.path.join(clip_recons_dir, 'render')))
 
+    # create dir for nfr dataset
+    util.create_dir(os.path.join(nfr_data_dir, 'A', 'train'))
+    util.create_dir(os.path.join(nfr_data_dir, 'B', 'train'))
     # save into nfr dataset
     for i in tqdm(range(len(masks)), desc="[build_nfr_dataset]: Write into A/train or B/train"):
         mask   = cv2.imread(masks[i])
@@ -271,16 +273,16 @@ def build_nfr_dataset(dataset_dir, speaker):
         masked_crop   = cv2.bitwise_and(crop, mask)
         masked_render = cv2.bitwise_and(render, mask)
 
-        cv2.imwrite(os.path.join(data_dir, 'nfr', 'A', 'train', '%05d.png' % (i+1)), masked_crop)
-        cv2.imwrite(os.path.join(data_dir, 'nfr', 'B', 'train', '%05d.png' % (i+1)), masked_render)
+        cv2.imwrite(os.path.join(nfr_data_dir, 'A', 'train', '%05d.png' % (i+1)), masked_crop)
+        cv2.imwrite(os.path.join(nfr_data_dir, 'B', 'train', '%05d.png' % (i+1)), masked_render)
 
     # create AB dataset from A, B dirs
-    for sp in os.listdir(os.path.join(data_dir, 'nfr', 'A')):
-        image_fold_A = os.path.join(os.path.join(data_dir, 'nfr', 'A'), sp)
-        image_fold_B = os.path.join(os.path.join(data_dir, 'nfr', 'B'), sp)
+    for sp in os.listdir(os.path.join(nfr_data_dir, 'A')):
+        image_fold_A = os.path.join(os.path.join(nfr_data_dir, 'A'), sp)
+        image_fold_B = os.path.join(os.path.join(nfr_data_dir, 'B'), sp)
         image_list = os.listdir(image_fold_A)
 
-        image_fold_AB = os.path.join(data_dir, 'nfr', 'AB', sp)
+        image_fold_AB = os.path.join(nfr_data_dir, 'AB', sp)
         if not os.path.isdir(image_fold_AB):
             os.makedirs(image_fold_AB)
 
@@ -314,10 +316,11 @@ if __name__ == "__main__":
     parser.add_argument("--celebtalk_dir", type=str, default="~/assets/CelebTalk")
     parser.add_argument("--data_dir", type=str, default=None)
     parser.add_argument("--recons_dir", type=str, default=None)
+    parser.add_argument("--nfr_data_dir", type=str, default=None)
     parser.add_argument("--dest_size", type=int, default=256)
     parser.add_argument('--matlab_data_path', type=str, default='renderer/data/data.mat')
     parser.add_argument("--lower", action="store_true", help="only use lower face")
-    parser.add_argument("--speaker", type=str, nargs="+", default=["FaceTalk_170725_00137_TA"])
+    parser.add_argument("--speaker", type=str, default=None)
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
@@ -330,9 +333,9 @@ if __name__ == "__main__":
         prepare_celebtalk(args.data_dir, spk_dir, dest_size=args.dest_size, debug=args.debug, training=True)
         prepare_celebtalk(args.data_dir, spk_dir, dest_size=args.dest_size, debug=args.debug, training=False)
     elif args.mode == "visualize_reconstruction":
-        visualize_reconstruction(args.data_dir, args.speakers)
+        visualize_reconstruction(args.data_dir, args.recons_dir)
     elif args.mode == "generate_masks":
         mouth_mask = networks.MouthMask(args)
         generate_masks(mouth_mask, args.recons_dir, debug=args.debug)
     elif args.mode == "build_nfr_dataset":
-        build_nfr_dataset(args.dataset_dir, spk)
+        build_nfr_dataset(args.data_dir, args.recons_dir, args.nfr_data_dir)

@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     foregrounds = get_file_list(os.path.join(opt.src_dir, 'images'), suffix='fake')
     backgrounds = get_file_list(os.path.join(opt.tgt_dir, 'crop'))
-    masks = get_file_list(os.path.join(opt.tgt_dir, 'mask'))
+    masks = get_file_list(os.path.join(opt.recons_dir, 'mask'))
 
     for i in tqdm(range(len(foregrounds))):
         fg = cv2.imread(foregrounds[i])

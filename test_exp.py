@@ -15,7 +15,9 @@ if __name__ == '__main__':
     opt.batch_size = 1    # test code only supports batch_size = 1
     opt.serial_batches = True  # disable data shuffling; comment this line if results on randomly chosen images are needed.
 
-    create_dir(os.path.join(opt.data_dir, 'reenact_delta'))
+    assert opt.result_dir is not None
+
+    create_dir(os.path.join(opt.result_dir, 'reenact_delta'))
 
     dataset = create_dataset(opt)
 

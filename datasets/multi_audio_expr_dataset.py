@@ -79,13 +79,16 @@ class MultiAudioExprDataset(BaseDataset):
             ret['feature_list'] = util.load_coef(os.path.join(clip_dir, 'feature'), verbose=False)
             ret['filenames']    = util.get_file_list(os.path.join(clip_dir, 'feature'))
 
+            ss = clip_dir.split('/')
+            clip_recons_dir = os.path.join(self.opt.recons_dir, ss[-2], ss[-1])
+
             if self.opt.isTrain:
-                ret['alpha_list']       = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'alpha'      ), verbose=False)
-                ret['beta_list']        = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'beta'       ), verbose=False)
-                ret['delta_list']       = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'delta'      ), verbose=False)
-                ret['gamma_list']       = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'gamma'      ), verbose=False)
-                ret['rotation_list']    = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'rotation'   ), verbose=False)
-                ret['translation_list'] = util.load_coef(os.path.join(clip_dir, 'reconstructed', 'translation'), verbose=False)
+                ret['alpha_list']       = util.load_coef(os.path.join(clip_recons_dir, 'alpha'      ), verbose=False)
+                ret['beta_list']        = util.load_coef(os.path.join(clip_recons_dir, 'beta'       ), verbose=False)
+                ret['delta_list']       = util.load_coef(os.path.join(clip_recons_dir, 'delta'      ), verbose=False)
+                ret['gamma_list']       = util.load_coef(os.path.join(clip_recons_dir, 'gamma'      ), verbose=False)
+                ret['rotation_list']    = util.load_coef(os.path.join(clip_recons_dir, 'rotation'   ), verbose=False)
+                ret['translation_list'] = util.load_coef(os.path.join(clip_recons_dir, 'translation'), verbose=False)
 
             self.clips.append(ret)
             # append coordinates

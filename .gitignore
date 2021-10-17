@@ -11,6 +11,8 @@ data/test_audio/comp
 data/test_audio/result.mp4
 data/
 
+yk_exp/
+
 */*.pyc
 */**/*.pyc
 */**/**/*.pyc

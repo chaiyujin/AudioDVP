@@ -45,7 +45,7 @@ function RUN_WITH_LOCK_GUARD() {
   fi
 
   if [ -f "$lock_file" ]; then
-    printf "Command '${tag}' is skipped due to existance of lock_file ${lock_file}\n"
+    printf "[Skip]: Command '${tag}' is already done. (lock_file: '${lock_file}')\n"
     return
   fi
 
@@ -119,17 +119,17 @@ function PrepareData() {
 
   RUN_WITH_LOCK_GUARD --tag="Reconstruct" --lock_file="${NET_DIR}/recons3d_net.pth" -- \
   python3 train.py \
-    --dataset_mode multi \
-    --num_epoch ${EPOCH} \
-    --lambda_photo 2.0 \
-    --lambda_land 6e-3 \
-    --serial_batches False \
-    --display_freq 400 \
-    --print_freq 400 \
-    --batch_size 5 \
-    --net_dir $NET_DIR \
-    --data_dir $DATA_DIR \
-    --recons_dir $RECONS_DIR \
+    --dataset_mode    multi \
+    --num_epoch       ${EPOCH} \
+    --lambda_photo    2.0 \
+    --lambda_land     6e-3 \
+    --serial_batches  False \
+    --display_freq    400 \
+    --print_freq      400 \
+    --batch_size      5 \
+    --net_dir         $NET_DIR \
+    --data_dir        $DATA_DIR \
+    --recons_dir      $RECONS_DIR \
   ;
 
   # generate masks
@@ -151,85 +151,89 @@ function PrepareData() {
     exit 1;
   }
 
-  # * Create lock file
-  [ ! -f "$JOB_LOCK" ] || touch "$JOB_LOCK"
+  # * Create lock file if failed to find lock file
+  [ -f "$JOB_LOCK" ] || touch "$JOB_LOCK"
 }
 
 # * -------------------------------------------- Train Audio2Expression -------------------------------------------- * #
 
 function TrainA2E() {
-  local DATA_DIR=
-  local NET_DIR=
-  local SPEAKER=
+  local EXP_DIR=
   local EPOCH=
   # Override from arguments
   for var in "$@"; do
     case $var in
-      --data_dir=*  ) DATA_DIR=${var#*=}  ;;
-      --net_dir=*   ) NET_DIR=${var#*=}   ;;
-      --speaker=*   ) SPEAKER=${var#*=}   ;;
-      --epoch=*     ) EPOCH=${var#*=}     ;;
+      --exp_dir=* ) EXP_DIR=${var#*=}   ;;
+      --epoch=*   ) EPOCH=${var#*=}     ;;
     esac
   done
 
-  [ -n "$DATA_DIR" ] || { echo "data_dir is not set!"; exit 1; }
-  [ -n "$NET_DIR"  ] || { echo "net_dir is not set!";  exit 1; }
-  [ -n "$SPEAKER"  ] || { echo "speaker is not set!";  exit 1; }
-  [ -n "$EPOCH"    ] || { echo "epoch is not set!";    exit 1; }
+  [ -n "$EXP_DIR" ] || { echo "exp_dir is not set!";  exit 1; }
+  [ -n "$EPOCH"   ] || { echo "epoch is not set!";    exit 1; }
+
+  local NET_DIR="$EXP_DIR/checkpoints"
+  local DATA_DIR="$EXP_DIR/data"
+  local RECONS_DIR="$EXP_DIR/reconstructed"
 
   # train
-  RUN_WITH_LOCK_GUARD --tag="Reconstruct" --lock_file="${NET_DIR}/delta_net.pth" -- \
+  RUN_WITH_LOCK_GUARD --tag="Audio2Expression" --lock_file="${NET_DIR}/net_a2e.pth" -- \
   python train_exp.py \
-    --dataset_mode multi_audio_expr \
-    --num_epoch ${EPOCH} \
-    --serial_batches False \
-    --display_freq 800 \
-    --print_freq 800 \
-    --batch_size 5 \
-    --lr 1e-3 \
-    --lambda_delta 1.0 \
-    --data_dir "$DATA_DIR/$SPEAKER" \
-    --net_dir $NET_DIR \
+    --dataset_mode    multi_audio_expr \
+    --num_epoch       $EPOCH \
+    --serial_batches  False \
+    --display_freq    800 \
+    --print_freq      800 \
+    --batch_size      5 \
+    --lr              1e-3 \
+    --lambda_delta    1.0 \
+    --net_dir         $NET_DIR \
+    --data_dir        $DATA_DIR \
+    --recons_dir      $RECONS_DIR \
   ;
 }
 
 # * ------------------------------------------ Train neural face renderer ------------------------------------------ * #
 
 function TrainNFR() {
-  local DATA_DIR=
-  local NET_DIR=
-  local SPEAKER=
+  local EXP_DIR=
   local EPOCH=
   local DEBUG=
   # Override from arguments
   for var in "$@"; do
     case $var in
-      --data_dir=*  ) DATA_DIR=${var#*=}  ;;
-      --net_dir=*   ) NET_DIR=${var#*=}   ;;
-      --speaker=*   ) SPEAKER=${var#*=}   ;;
+      --exp_dir=*   ) EXP_DIR=${var#*=}   ;;
       --epoch=*     ) EPOCH=${var#*=}     ;;
       --debug       ) DEBUG="--debug"     ;;
     esac
   done
 
-  [ -n "$DATA_DIR" ] || { echo "data_dir is not set!"; exit 1; }
-  [ -n "$NET_DIR"  ] || { echo "net_dir is not set!";  exit 1; }
-  [ -n "$SPEAKER"  ] || { echo "speaker is not set!";  exit 1; }
+  [ -n "$EXP_DIR"  ] || { echo "exp_dir is not set!";  exit 1; }
   [ -n "$EPOCH"    ] || { echo "epoch is not set!";    exit 1; }
 
+  local NET_DIR="$EXP_DIR/checkpoints"
+  local DATA_DIR="$EXP_DIR/data"
+  local RECONS_DIR="$EXP_DIR/reconstructed"
+  local NFR_DATA_DIR="$EXP_DIR/nfr"
+
   # data generation
-  if ! python3 yk_tools.py build_nfr_dataset --dataset_dir $CWD/$DATA_DIR --speaker $SPEAKER ${DEBUG}; then
-    printf "${ERROR} Failed to build nfr dataset!\n"
-    exit 1
-  fi
+  python3 yk_tools.py build_nfr_dataset \
+    --data_dir     $DATA_DIR \
+    --recons_dir   $RECONS_DIR \
+    --nfr_data_dir $NFR_DATA_DIR \
+    ${DEBUG} \
+  || {
+    printf "${ERROR} Failed to build nfr dataset!\n";
+    exit 1;
+  }
 
   # training
   if [ ! -d "${NET_DIR}/nfr" ]; then
     # train neural face renderer
     if ! python3 vendor/neural-face-renderer/train.py \
       --checkpoints_dir "$NET_DIR" \
-      --dataroot "$DATA_DIR/$SPEAKER/nfr/AB" \
-      --dataset_mode temporal \
+      --dataroot        "$NFR_DATA_DIR/AB" \
+      --dataset_mode    temporal \
+      --save_epoch_freq 20 \
       --preprocess none --load_size 256 --Nw 7 \
       --name nfr --model nfr \
       --netG unet_256 --direction BtoA --norm batch --pool_size 0 --use_refine --input_nc 21 \
@@ -269,64 +273,71 @@ function TrainNFR() {
 # * ------------------------------------------------- Test Function ------------------------------------------------ * #
 
 function TestClip() {
-  local clip_dir=
-  local reenact_tar=
-  local result_dir=
-  local result_vpath=
-  local net_dir=
-  local epoch_nfr=
+  local EXP_DIR=
+  local EPOCH_NFR=
+  local SRC_DIR=
+  local TGT_DIR=
+  local TGT_REC_DIR=
+  local RES_DIR=
   # Override from arguments
   for var in "$@"; do
     case $var in
-      --clip_dir=*     ) clip_dir=${var#*=}     ;;
-      --reenact_tar=*  ) reenact_tar=${var#*=}     ;;
-      --result_dir=*   ) result_dir=${var#*=}   ;;
-      --result_vpath=* ) result_vpath=${var#*=} ;;
-      --net_dir=*      ) net_dir=${var#*=}      ;;
-      --epoch_nfr=*    ) epoch_nfr=${var#*=}    ;;
+      --exp_dir=*       ) EXP_DIR=${var#*=}   ;;
+      --epoch_nfr=*     ) EPOCH_NFR=${var#*=} ;;
+      --src_audio_dir=* ) SRC_DIR=${var#*=}   ;;
+      --tgt_video_dir=* ) TGT_DIR=${var#*=}   ;;
+      --tgt_recons_dir=*) TGT_REC_DIR=${var#*=} ;;
+      --result_dir=*    ) RES_DIR=${var#*=}   ;;
     esac
   done
   # check
-  [ -n "$clip_dir"     ] || { echo "clip_dir is not set!";     exit 1; }
-  [ -n "$result_dir"   ] || { echo "result_dir is not set!";   exit 1; }
-  [ -n "$result_vpath" ] || { echo "result_vpath is not set!"; exit 1; }
-  [ -n "$net_dir"      ] || { echo "net_dir is not set!";      exit 1; }
+  [ -n "$EXP_DIR"     ] || { echo "exp_dir is not set!";       exit 1; }
+  [ -n "$SRC_DIR"     ] || { echo "src_audio_dir is not set!"; exit 1; }
+  [ -n "$TGT_DIR"     ] || { echo "tgt_video_dir is not set!"; exit 1; }
+  [ -n "$TGT_REC_DIR" ] || { echo "tgt_recons_dir is not set!"; exit 1; }
+  [ -n "$RES_DIR"     ] || { echo "result_dir is not set!";    exit 1; }
+
+  local NET_DIR="$EXP_DIR/checkpoints"
 
   # guard
-  if [ ! -f "$clip_dir/audio/audio.wav" ]; then
-    printf "${ERROR} Failed to find '$clip_dir/audio/audio.wav'!\n"
+  if [ ! -f "$SRC_DIR/audio/audio.wav" ]; then
+    printf "${ERROR} Failed to find '$SRC_DIR/audio/audio.wav'!\n"
     return
   fi
 
-  printf "> Generating results for '$clip_dir'\n"
-  cd ${CWD} && mkdir -p $clip_dir/feature
+  printf "> Generating results for '$SRC_DIR', reenacting video from '$TGT_DIR'\n"
+  
+  # Audio feature
+  mkdir -p $SRC_DIR/feature;
+  RUN_WITH_LOCK_GUARD --tag="audio_feat" --lock_file="$SRC_DIR/audio_feat.lock" -- \
+  python3 vendor/ATVGnet/code/test.py -i $SRC_DIR/ ;
 
-  RUN_WITH_LOCK_GUARD --tag="audio_feat" --lock_file="${clip_dir}/audio_feat.lock" -- \
-  python3 vendor/ATVGnet/code/test.py -i $clip_dir/ ;
-
-  RUN_WITH_LOCK_GUARD --tag="audio2expr" --lock_file="${clip_dir}/pred_a2e.lock" -- \
-  python3 test_exp.py --dataset_mode audio_expression --data_dir $clip_dir --net_dir $net_dir;
+  # Predict coeffs
+  RUN_WITH_LOCK_GUARD --tag="audio2expr" --lock_file="$RES_DIR/pred_a2e.lock" -- \
+  python3 test_exp.py --dataset_mode audio_expression --data_dir $SRC_DIR --result_dir $RES_DIR --net_dir $NET_DIR;
 
   # reenact face using predicted expression parameter
-  RUN_WITH_LOCK_GUARD --tag="reenact and render" --lock_file="${clip_dir}/reenact.lock" -- \
-  python3 reenact.py --src_dir "$clip_dir" --tgt_dir "$reenact_tar";
+  RUN_WITH_LOCK_GUARD --tag="reenact and render" --lock_file="$RES_DIR/reenact.lock" -- \
+  python3 reenact.py --src_dir "$RES_DIR" --tgt_dir "$TGT_REC_DIR";
 
   # create video result
-  if [ ! -f "${result_vpath}-render.mp4" ]; then
-    mkdir -p "$result_dir"
+  local vpath="$RES_DIR-render.mp4"
+  if [ ! -f "$vpath" ]; then
+    mkdir -p "$(dirname $vpath)" && \
     ffmpeg -y -loglevel error \
-      -thread_queue_size 8192 -i $clip_dir/audio/audio.wav \
-      -thread_queue_size 8192 -i $clip_dir/reenact/%05d.png \
-      -vcodec libx264 -preset slower -profile:v high -crf 18 -pix_fmt yuv420p -shortest "${result_vpath}-render.mp4" \
+      -thread_queue_size 8192 -i $SRC_DIR/audio/audio.wav \
+      -thread_queue_size 8192 -i $RES_DIR/reenact/%05d.png \
+      -vcodec libx264 -preset slower -profile:v high -crf 18 -pix_fmt yuv420p -shortest "$vpath" \
     ;
   fi
 
   # * If NFR is not trained, we directly return
-  if [ -z "${epoch_nfr}" ]; then
+  if [ -z "$EPOCH_NFR" ]; then
     return
   fi
 
   # neural rendering the reenact face sequence
+  RUN_WITH_LOCK_GUARD --tag="NFR for reenacted" --lock_file="$RES_DIR/nfr.lock" -- \
   python3 vendor/neural-face-renderer/test.py --model test \
     --netG unet_256 \
     --direction BtoA \
@@ -338,22 +349,24 @@ function TestClip() {
     --eval \
     --use_refine \
     --name nfr \
-    --checkpoints_dir $net_dir \
-    --dataroot $clip_dir/reenact \
-    --results_dir $clip_dir \
-    --epoch $epoch_nfr \
+    --checkpoints_dir $NET_DIR \
+    --epoch           $EPOCH_NFR \
+    --dataroot        $RES_DIR/reenact \
+    --results_dir     $RES_DIR \
   ;
 
   # composite lower face back to original video
-  python3 comp.py --src_dir "$clip_dir" --tgt_dir "$reenact_tar";
+  RUN_WITH_LOCK_GUARD --tag="comp" --lock_file="$RES_DIR/comp.lock" -- \
+  python3 comp.py --src_dir "$RES_DIR" --tgt_dir "$TGT_DIR" --recons_dir "$TGT_REC_DIR";
 
   # create video result
-  if [ ! -f "${result_vpath}-nfr.mp4" ]; then
-    mkdir -p "$result_dir"
+  local vpath="$RES_DIR-nfr.mp4"
+  if [ ! -f "$vpath" ]; then
+    mkdir -p "$(dirname $vpath)" && \
     ffmpeg -y -loglevel error \
-      -thread_queue_size 8192 -i $clip_dir/audio/audio.wav \
-      -thread_queue_size 8192 -i $clip_dir/comp/%05d.png \
-      -vcodec libx264 -preset slower -profile:v high -crf 18 -pix_fmt yuv420p -shortest "${result_vpath}-nfr.mp4" \
+      -thread_queue_size 8192 -i $SRC_DIR/audio/audio.wav \
+      -thread_queue_size 8192 -i $RES_DIR/comp/%05d.png \
+      -vcodec libx264 -preset slower -profile:v high -crf 18 -pix_fmt yuv420p -shortest "$vpath" \
     ;
   fi
 
@@ -384,11 +397,11 @@ function RUN_YK_EXP() {
   done
 
   # Check variables
-  [ -z "$DATA_SRC" ] || { echo "data_src is not set!"; exit 1; }
-  [ -z "$SPEAKER"  ] || { echo "speaker is not set!";  exit 1; }
-  # Check EPOCH_NFR is none or times of 25
-  if [ -n "${EPOCH_NFR}" ] && [ "$(( ${EPOCH_NFR} % 25 ))" -ne 0 ]; then
-    printf "${ERROR} EPOCH_NFR=${EPOCH_NFR}, which is not times of 25!\n"
+  [ -n "$DATA_SRC" ] || { echo "data_src is not set!"; exit 1; }
+  [ -n "$SPEAKER"  ] || { echo "speaker is not set!";  exit 1; }
+  # Check EPOCH_NFR is none or times of 20
+  if [ -n "${EPOCH_NFR}" ] && [ "$(( ${EPOCH_NFR} % 20 ))" -ne 0 ]; then
+    printf "${ERROR} EPOCH_NFR=${EPOCH_NFR}, which is not times of 20!\n"
     exit 1
   fi
   DATA_SRC=${DATA_SRC,,}
@@ -396,15 +409,12 @@ function RUN_YK_EXP() {
   # Some preset dirs
   local EXP_DIR="yk_exp/$DATA_SRC/$SPEAKER"
   # Shared arguments
-  local SHARED="--data_src=$DATA_SRC --exp_dir=$EXP_DIR --speaker=$SPEAKER ${DEBUG}"
+  local SHARED="--data_src=$DATA_SRC --speaker=$SPEAKER --exp_dir=$EXP_DIR ${DEBUG}"
 
   # Print arguments
   DRAW_DIVIDER;
   printf "Data source    : $DATA_SRC\n"
   printf "Speaker        : $SPEAKER\n"
-  printf "Data directory : $DATA_DIR\n"
-  printf "Checkpoints    : $NET_DIR\n"
-  printf "Results        : $NET_DIR\n"
   printf "Epoch for D3D  : $EPOCH_D3D\n"
   printf "Epoch for A2E  : $EPOCH_A2E\n"
   printf "Epoch for NFR  : $EPOCH_NFR\n"
@@ -422,17 +432,17 @@ function RUN_YK_EXP() {
 
   # * Test
   DRAW_DIVIDER;
-  for d in "$DATA_DIR/$SPEAKER/test"/*; do
+  for d in "$EXP_DIR/data/test"/*; do
     if [ ! -d "$d" ]; then continue; fi
     local clip_id="$(basename ${d})"
 
     TestClip \
-      --clip_dir="$d" \
-      --reenact_tar="$d" \
-      --result_dir="$DATA_DIR/$SPEAKER/results" \
-      --result_vpath="$DATA_DIR/$SPEAKER/results/test-$clip_id" \
-      --net_dir="$NET_DIR" \
+      --exp_dir="$EXP_DIR" \
       --epoch_nfr="$EPOCH_NFR" \
+      --src_audio_dir="$d" \
+      --tgt_video_dir="$d" \
+      --tgt_recons_dir="$EXP_DIR/reconstructed/test/$clip_id" \
+      --result_dir="$EXP_DIR/results/self-reenact/$clip_id" \
     ;
   done
 }

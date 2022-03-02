@@ -102,7 +102,7 @@ class MultiAudioExprDataset(BaseDataset):
  
         # load clips
         for clip_dir in clip_dirs:
-            # print(clip_dir)
+            print(">> Data from: '{}'".format(clip_dir))
             _load_dir(clip_dir)
 
         print("MultiAudioExprDataset has loaded data for speaker: {}".format(self.speaker))

@@ -79,6 +79,7 @@ function PrepareData() {
   local SPEAKER=
   local EXP_DIR=
   local EPOCH=
+  local USE_SEQS=
   local DEBUG=
   # Override from arguments
   for var in "$@"; do
@@ -87,6 +88,7 @@ function PrepareData() {
       --speaker=*  ) SPEAKER=${var#*=}   ;;
       --exp_dir=*  ) EXP_DIR=${var#*=}   ;;
       --epoch=*    ) EPOCH=${var#*=}     ;;
+      --use_seqs=* ) USE_SEQS=${var#*=}  ;;
       --debug      ) DEBUG="--debug"     ;;
     esac
   done
@@ -109,14 +111,15 @@ function PrepareData() {
 
   # prepare data
   python3 yk_tools.py "prepare_$DATA_SRC" \
-    --data_dir $DATA_DIR  \
-    --speaker  $SPEAKER   \
+    --data_dir $DATA_DIR \
+    --speaker  $SPEAKER  \
+    --use_seqs $USE_SEQS \
     ${DEBUG} \
   || {
     printf "${ERROR} Failed to prepare data for source: ${DATA_SRC}!\n";
     exit 1;
   }
-
+  
   RUN_WITH_LOCK_GUARD --tag="Reconstruct" --lock_file="${NET_DIR}/recons3d_net.pth" -- \
   python3 train.py \
     --dataset_mode    multi \
@@ -382,6 +385,7 @@ function RUN_YK_EXP() {
   local EPOCH_D3D=60
   local EPOCH_A2E=60
   local EPOCH_NFR=
+  local USE_SEQS=
   local DEBUG=
   # Override from arguments
   for var in "$@"; do
@@ -392,6 +396,7 @@ function RUN_YK_EXP() {
       --epoch_d3d=* ) EPOCH_D3D=${var#*=} ;;
       --epoch_a2e=* ) EPOCH_A2E=${var#*=} ;;
       --epoch_nfr=* ) EPOCH_NFR=${var#*=} ;;
+      --use_seqs=*  ) USE_SEQS=${var#*=}  ;;
       --debug       ) DEBUG="--debug"     ;;
     esac
   done
@@ -420,7 +425,7 @@ function RUN_YK_EXP() {
   printf "Epoch for NFR  : $EPOCH_NFR\n"
 
   # * Step 1: Prepare data
-  DRAW_DIVIDER; PrepareData $SHARED --epoch=$EPOCH_D3D
+  DRAW_DIVIDER; PrepareData $SHARED --epoch=$EPOCH_D3D --use_seqs=$USE_SEQS
 
   # * Step 2: Train audio to expression
   DRAW_DIVIDER; TrainA2E ${SHARED} --epoch=$EPOCH_A2E

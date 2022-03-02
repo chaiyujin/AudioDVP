@@ -55,6 +55,7 @@ class MultiDataset(BaseDataset):
         self.speaker = None
         # load from each clip
         for clip_dir in clip_dirs:
+            print(">> Data from: '{}'".format(clip_dir))
             # check only one speaker
             spk = os.path.basename(os.path.dirname(os.path.dirname(clip_dir)))
             if self.speaker is not None:

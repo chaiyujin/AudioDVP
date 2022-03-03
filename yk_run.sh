@@ -11,4 +11,8 @@ source yk_functions.sh
 # RUN_VOCASET --epoch_d3d=20 --epoch_a2e=40 --epoch_nfr='' --speaker=FaceTalk_170908_03277_TA --debug
 
 # RUN_YK_EXP --data_src=celebtalk --epoch_d3d=60 --epoch_a2e=60 --epoch_nfr=80 --speaker=m000_obama  # --debug
-RUN_YK_EXP --data_src=celebtalk --epoch_d3d=60 --epoch_a2e=60 --speaker=m001_trump --use_seqs="trn-000,trn-001,vld-000,vld-001" --debug
+
+source nohup_run.sh
+
+# NOHUP_RUN --device=1 --include=yk_functions.sh -- \
+# RUN_YK_EXP --data_src=celebtalk --epoch_d3d=60 --epoch_a2e=60 --speaker=m001_trump --use_seqs="trn-000,trn-001,vld-000,vld-001";

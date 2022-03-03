@@ -1,6 +1,7 @@
 .vscode/
 runs/
 weights/*
+.snaps/
 
 data/video/*
 data/test_audio/feature

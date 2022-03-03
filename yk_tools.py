@@ -5,7 +5,6 @@ import cv2
 import toml
 import pickle
 import numpy as np
-import face_recognition
 from glob import glob
 from tqdm import tqdm
 from shutil import rmtree

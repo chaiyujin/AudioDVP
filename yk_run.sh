@@ -14,5 +14,6 @@ source yk_functions.sh
 
 source nohup_run.sh
 
+# CUDA_VISIBLE_DEVICES=1 \
 # NOHUP_RUN --device=1 --include=yk_functions.sh -- \
-# RUN_YK_EXP --data_src=celebtalk --epoch_d3d=60 --epoch_a2e=60 --speaker=m001_trump --use_seqs="trn-000,trn-001,vld-000,vld-001";
+# RUN_YK_EXP --data_src=celebtalk --epoch_d3d=100 --epoch_a2e=100 --speaker=m001_trump --use_seqs="trn-000,trn-001,vld-000,vld-001";

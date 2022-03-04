@@ -124,12 +124,9 @@ function PrepareData() {
   python3 train.py \
     --dataset_mode    multi \
     --num_epoch       ${EPOCH} \
-    --lambda_photo    2.0 \
-    --lambda_land     6e-3 \
     --serial_batches  False \
     --display_freq    400 \
     --print_freq      400 \
-    --batch_size      5 \
     --net_dir         $NET_DIR \
     --data_dir        $DATA_DIR \
     --recons_dir      $RECONS_DIR \

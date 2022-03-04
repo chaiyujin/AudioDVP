@@ -316,6 +316,9 @@ function TestClip() {
   RUN_WITH_LOCK_GUARD --tag="audio2expr" --lock_file="$RES_DIR/pred_a2e.lock" -- \
   python3 test_exp.py --dataset_mode audio_expression --data_dir $SRC_DIR --result_dir $RES_DIR --net_dir $NET_DIR;
 
+  python3 gen3d.py --src_dir "$RES_DIR" --tgt_dir "$TGT_REC_DIR" --apath "$SRC_DIR/audio/audio.wav" \
+    --spk_dir "$RES_DIR/../..";
+
   # reenact face using predicted expression parameter
   RUN_WITH_LOCK_GUARD --tag="reenact and render" --lock_file="$RES_DIR/reenact.lock" -- \
   python3 reenact.py --src_dir "$RES_DIR" --tgt_dir "$TGT_REC_DIR";
@@ -444,7 +447,7 @@ function RUN_YK_EXP() {
       --src_audio_dir="$d" \
       --tgt_video_dir="$d" \
       --tgt_recons_dir="$EXP_DIR/reconstructed/test/$clip_id" \
-      --result_dir="$EXP_DIR/results/self-reenact/$clip_id" \
+      --result_dir="$EXP_DIR/results/$clip_id" \
     ;
   done
 }

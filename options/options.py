@@ -39,6 +39,8 @@ class Options:
         self.parser.add_argument('--src_dir', type=str, default=None)
         self.parser.add_argument('--tgt_dir', type=str, default=None)
         self.parser.add_argument('--net_dir', type=str, default=None)
+        self.parser.add_argument('--spk_dir', type=str, default=None)
+        self.parser.add_argument('--apath', type=str, default=None)
         self.parser.add_argument('--recons_dir', type=str, default=None)
         self.parser.add_argument('--result_dir', type=str, default=None)
 
